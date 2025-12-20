@@ -419,6 +419,23 @@ def search_workspace(workspace_id):
 
         dataset_ids = workspace['dataset_ids']
 
+        # Fetch dataset metadata for titles
+        dataset_metadata = {}
+        for dataset_id in dataset_ids:
+            try:
+                pkg_url = f"{CKAN_API_BASE}/package_show"
+                pkg_response = requests.get(pkg_url, params={'id': dataset_id}, timeout=5)
+                if pkg_response.status_code == 200:
+                    pkg_data = pkg_response.json()
+                    if pkg_data.get('success'):
+                        dataset_metadata[dataset_id] = {
+                            'title': pkg_data['result'].get('title', dataset_id),
+                            'name': pkg_data['result'].get('name', '')
+                        }
+            except Exception as e:
+                print(f"Error fetching metadata for {dataset_id}: {e}")
+                dataset_metadata[dataset_id] = {'title': dataset_id, 'name': ''}
+
         # Load all datasets from workspace
         all_features = []
         for dataset_id in dataset_ids:
@@ -464,7 +481,8 @@ def search_workspace(workspace_id):
             'workspace_name': workspace['name'],
             'query': query,
             'count': len(results),
-            'results': results
+            'results': results,
+            'dataset_metadata': dataset_metadata
         })
 
     except Exception as e:

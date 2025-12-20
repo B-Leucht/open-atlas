@@ -82,23 +82,25 @@ function MapView({ results, onMapMove }) {
   // Munich center coordinates
   const munichCenter = [48.1351, 11.5820];
 
+  // Generate color from string hash (for dataset IDs)
+  const stringToColor = (str) => {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+
+    // Generate bright, distinct colors
+    const hue = Math.abs(hash % 360);
+    const saturation = 65 + (Math.abs(hash >> 8) % 20); // 65-85%
+    const lightness = 45 + (Math.abs(hash >> 16) % 15); // 45-60%
+
+    return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+  };
+
   // Get category color
   const getCategoryColor = (category) => {
-    const colors = {
-      markets: '#4CAF50',
-      bike_infrastructure: '#2196F3',
-      districts: '#FF9800',
-      isar_dangers: '#f44336',
-      disabled_parking: '#9C27B0',
-      waste_disposal: '#795548',
-      accessible_glass_containers: '#8BC34A',
-      charging_infrastructure: '#FFC107',
-      community_centers: '#E91E63',
-      bike_service_stations: '#3F51B5',
-      environmental_zone: '#009688',
-      recycling_islands: '#CDDC39'
-    };
-    return colors[category] || '#757575';
+    // Use dynamic color generation for dataset IDs
+    return stringToColor(category || 'default');
   };
 
   // Create custom icon with category color
