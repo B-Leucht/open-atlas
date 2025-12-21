@@ -28,6 +28,7 @@ function App() {
   // UI state
   const [viewMode, setViewMode] = useState('list'); // 'list' or 'map'
   const [sidebarVisible, setSidebarVisible] = useState(true);
+  const [displayLimit, setDisplayLimit] = useState(20); // Limit results in list view
 
   useEffect(() => {
     loadWorkspaces();
@@ -124,6 +125,7 @@ function App() {
     if (!selectedWorkspace) return;
 
     setLoading(true);
+    setDisplayLimit(20); // Reset display limit on new search
     try {
       const response = await axios.get(
         `${API_URL}/workspaces/${selectedWorkspace.id}/search`,
@@ -161,31 +163,6 @@ function App() {
     ...result,
     category: result.dataset_id || 'unknown'
   }));
-
-  // Generate color from string hash (same as MapView)
-  const stringToColor = (str) => {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      hash = str.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    const hue = Math.abs(hash % 360);
-    const saturation = 65 + (Math.abs(hash >> 8) % 20);
-    const lightness = 45 + (Math.abs(hash >> 16) % 15);
-    return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
-  };
-
-  // Group results by dataset for legend
-  const datasetGroups = searchResults.reduce((acc, result) => {
-    const datasetId = result.dataset_id || 'unknown';
-    if (!acc[datasetId]) {
-      acc[datasetId] = { count: 0, hasGeo: false };
-    }
-    acc[datasetId].count++;
-    if (result.geometry && result.geometry.coordinates) {
-      acc[datasetId].hasGeo = true;
-    }
-    return acc;
-  }, {});
 
   return (
     <div className="app-container">
@@ -345,61 +322,94 @@ function App() {
                 <div className="loading">Loading...</div>
               ) : viewMode === 'map' ? (
                 <div className="map-container-wrapper">
-                  <MapView results={mapResults} />
-                  {Object.keys(datasetGroups).length > 0 && (
-                    <div className="map-legend">
-                      <div className="legend-header">Data Sources</div>
-                      <div className="legend-content">
-                        {Object.entries(datasetGroups).map(([datasetId, info]) => {
-                          const metadata = datasetMetadata[datasetId];
-                          const displayName = metadata?.title || datasetId.substring(0, 12) + '...';
-                          const color = stringToColor(datasetId);
-                          return (
-                            <div key={datasetId} className="legend-item">
-                              <div
-                                className="legend-color"
-                                style={{ backgroundColor: color }}
-                                title={`Color for ${metadata?.title || datasetId}`}
-                              />
-                              <div className="legend-dataset" title={metadata?.title || datasetId}>
-                                {displayName}
-                              </div>
-                              <div className="legend-stats">
-                                {info.count} item{info.count !== 1 ? 's' : ''}
-                                {info.hasGeo && ' 📍'}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                      <div className="legend-footer">
-                        {searchResults.length} total result{searchResults.length !== 1 ? 's' : ''}
-                      </div>
-                    </div>
-                  )}
+                  <MapView results={mapResults} datasetMetadata={datasetMetadata} />
                 </div>
               ) : (
                 <div className="results">
                   <div className="results-header">
                     {searchResults.length} result{searchResults.length !== 1 ? 's' : ''}
+                    {searchResults.length > displayLimit && (
+                      <span style={{ marginLeft: '0.5rem', color: '#999', fontSize: '0.85rem' }}>
+                        (showing {displayLimit})
+                      </span>
+                    )}
                   </div>
                   <div className="results-list">
-                    {searchResults.map((result, idx) => (
-                      <div key={idx} className="result-item">
-                        <div className="result-properties">
-                          {Object.entries(result.properties || {}).map(([key, value]) => (
-                            <div key={key} className="property">
-                              <span className="property-key">{key}:</span>
-                              <span className="property-value">{String(value)}</span>
-                            </div>
-                          ))}
+                    {searchResults.slice(0, displayLimit).map((result, idx) => {
+                      const metadata = datasetMetadata[result.dataset_id];
+                      const datasetName = metadata?.title || result.dataset_id;
+
+                      // Filter properties: exclude technical fields, empty values, and very long strings
+                      const filteredProperties = Object.entries(result.properties || {})
+                        .filter(([key, value]) => {
+                          if (!value) return false;
+                          const keyLower = key.toLowerCase();
+                          // Exclude technical/system fields
+                          if (keyLower.includes('objectid') ||
+                              keyLower.includes('shape') ||
+                              keyLower.includes('coord') ||
+                              keyLower.includes('geometry') ||
+                              keyLower.includes('fid')) {
+                            return false;
+                          }
+                          // Exclude very long strings
+                          const valueStr = String(value);
+                          if (valueStr.length > 200) return false;
+                          return true;
+                        })
+                        .slice(0, 6); // Limit to 6 properties
+
+                      return (
+                        <div key={idx} className="result-item">
+                          <div className="result-dataset" style={{
+                            fontSize: '0.85rem',
+                            color: '#667eea',
+                            fontWeight: '600',
+                            marginBottom: '0.5rem'
+                          }}>
+                            {datasetName}
+                          </div>
+                          <div className="result-properties">
+                            {filteredProperties.map(([key, value]) => (
+                              <div key={key} className="property">
+                                <span className="property-key">{key.replace(/_/g, ' ')}:</span>
+                                <span className="property-value">{String(value)}</span>
+                              </div>
+                            ))}
+                          </div>
+                          {result.distance_km && (
+                            <div className="result-distance">{result.distance_km} km</div>
+                          )}
                         </div>
-                        {result.distance_km && (
-                          <div className="result-distance">{result.distance_km} km</div>
-                        )}
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
+                  {searchResults.length > displayLimit && (
+                    <div style={{
+                      textAlign: 'center',
+                      padding: '1rem',
+                      marginTop: '0.5rem'
+                    }}>
+                      <button
+                        onClick={() => setDisplayLimit(prev => prev + 20)}
+                        style={{
+                          padding: '0.75rem 1.5rem',
+                          background: '#667eea',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          fontSize: '0.9rem',
+                          fontWeight: '500',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                        }}
+                        onMouseOver={(e) => e.target.style.background = '#5568d3'}
+                        onMouseOut={(e) => e.target.style.background = '#667eea'}
+                      >
+                        Show More ({searchResults.length - displayLimit} remaining)
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </>

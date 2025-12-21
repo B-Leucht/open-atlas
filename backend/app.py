@@ -4,6 +4,8 @@ import json
 import requests
 import sqlite3
 import uuid
+import csv
+import io
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 from functools import lru_cache
@@ -40,7 +42,9 @@ def init_db():
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
                 description TEXT,
-                dataset_ids TEXT NOT NULL,
+                dataset_ids TEXT,
+                groups TEXT,
+                tags TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
@@ -62,22 +66,30 @@ def get_workspace_by_id(workspace_id: str) -> Optional[Dict[str, Any]]:
                 'id': row['id'],
                 'name': row['name'],
                 'description': row['description'],
-                'dataset_ids': json.loads(row['dataset_ids']),
+                'dataset_ids': json.loads(row['dataset_ids']) if row['dataset_ids'] else [],
+                'groups': json.loads(row['groups']) if row['groups'] else [],
+                'tags': json.loads(row['tags']) if row['tags'] else [],
                 'created_at': row['created_at'],
                 'updated_at': row['updated_at']
             }
         return None
 
-def create_workspace(name: str, dataset_ids: List[str], description: str = '') -> Dict[str, Any]:
-    """Create a new workspace"""
+def create_workspace(name: str, dataset_ids: List[str] = None, groups: List[str] = None,
+                     tags: List[str] = None, description: str = '') -> Dict[str, Any]:
+    """Create a new workspace with datasets, groups, and/or tags"""
     workspace_id = str(uuid.uuid4())
     now = datetime.utcnow().isoformat()
 
+    dataset_ids = dataset_ids or []
+    groups = groups or []
+    tags = tags or []
+
     with get_db() as conn:
         conn.execute(
-            '''INSERT INTO workspaces (id, name, description, dataset_ids, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?)''',
-            (workspace_id, name, description, json.dumps(dataset_ids), now, now)
+            '''INSERT INTO workspaces (id, name, description, dataset_ids, groups, tags, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
+            (workspace_id, name, description, json.dumps(dataset_ids),
+             json.dumps(groups), json.dumps(tags), now, now)
         )
         conn.commit()
 
@@ -86,11 +98,14 @@ def create_workspace(name: str, dataset_ids: List[str], description: str = '') -
         'name': name,
         'description': description,
         'dataset_ids': dataset_ids,
+        'groups': groups,
+        'tags': tags,
         'created_at': now,
         'updated_at': now
     }
 
-def update_workspace(workspace_id: str, name: str = None, dataset_ids: List[str] = None, description: str = None) -> Optional[Dict[str, Any]]:
+def update_workspace(workspace_id: str, name: str = None, dataset_ids: List[str] = None,
+                     groups: List[str] = None, tags: List[str] = None, description: str = None) -> Optional[Dict[str, Any]]:
     """Update an existing workspace"""
     workspace = get_workspace_by_id(workspace_id)
     if not workspace:
@@ -101,6 +116,10 @@ def update_workspace(workspace_id: str, name: str = None, dataset_ids: List[str]
         workspace['name'] = name
     if dataset_ids is not None:
         workspace['dataset_ids'] = dataset_ids
+    if groups is not None:
+        workspace['groups'] = groups
+    if tags is not None:
+        workspace['tags'] = tags
     if description is not None:
         workspace['description'] = description
 
@@ -109,10 +128,11 @@ def update_workspace(workspace_id: str, name: str = None, dataset_ids: List[str]
     with get_db() as conn:
         conn.execute(
             '''UPDATE workspaces
-               SET name = ?, description = ?, dataset_ids = ?, updated_at = ?
+               SET name = ?, description = ?, dataset_ids = ?, groups = ?, tags = ?, updated_at = ?
                WHERE id = ?''',
             (workspace['name'], workspace['description'],
-             json.dumps(workspace['dataset_ids']), workspace['updated_at'], workspace_id)
+             json.dumps(workspace['dataset_ids']), json.dumps(workspace['groups']),
+             json.dumps(workspace['tags']), workspace['updated_at'], workspace_id)
         )
         conn.commit()
 
@@ -137,7 +157,9 @@ def list_workspaces() -> List[Dict[str, Any]]:
             'id': row['id'],
             'name': row['name'],
             'description': row['description'],
-            'dataset_ids': json.loads(row['dataset_ids']),
+            'dataset_ids': json.loads(row['dataset_ids']) if row['dataset_ids'] else [],
+            'groups': json.loads(row['groups']) if row['groups'] else [],
+            'tags': json.loads(row['tags']) if row['tags'] else [],
             'created_at': row['created_at'],
             'updated_at': row['updated_at']
         } for row in rows]
@@ -145,6 +167,172 @@ def list_workspaces() -> List[Dict[str, Any]]:
 # ============================================================================
 # CKAN API Functions
 # ============================================================================
+
+def get_datasets_from_group(group_id: str) -> List[str]:
+    """Get all dataset IDs from a CKAN group"""
+    try:
+        group_url = f"{CKAN_API_BASE}/group_show"
+        params = {'id': group_id, 'include_datasets': True}
+
+        response = requests.get(group_url, params=params, timeout=10)
+        response.raise_for_status()
+
+        data = response.json()
+        if data.get('success'):
+            packages = data.get('result', {}).get('packages', [])
+            return [pkg['id'] for pkg in packages]
+
+        return []
+    except Exception as e:
+        print(f"Error fetching datasets from group {group_id}: {e}")
+        return []
+
+def get_datasets_from_tag(tag_name: str) -> List[str]:
+    """Get all dataset IDs that have a specific tag"""
+    try:
+        search_url = f"{CKAN_API_BASE}/package_search"
+        params = {
+            'fq': f'tags:{tag_name}',
+            'rows': 1000,
+            'fl': 'id'
+        }
+
+        response = requests.get(search_url, params=params, timeout=10)
+        response.raise_for_status()
+
+        data = response.json()
+        if data.get('success'):
+            results = data.get('result', {}).get('results', [])
+            return [pkg['id'] for pkg in results]
+
+        return []
+    except Exception as e:
+        print(f"Error fetching datasets with tag {tag_name}: {e}")
+        return []
+
+def resolve_workspace_datasets(workspace: Dict[str, Any]) -> List[str]:
+    """Resolve all dataset IDs from workspace (direct IDs, groups, and tags)"""
+    all_dataset_ids = set()
+
+    # Add direct dataset IDs
+    all_dataset_ids.update(workspace.get('dataset_ids', []))
+
+    # Add datasets from groups
+    for group in workspace.get('groups', []):
+        group_datasets = get_datasets_from_group(group)
+        all_dataset_ids.update(group_datasets)
+        print(f"Group '{group}' added {len(group_datasets)} datasets")
+
+    # Add datasets from tags
+    for tag in workspace.get('tags', []):
+        tag_datasets = get_datasets_from_tag(tag)
+        all_dataset_ids.update(tag_datasets)
+        print(f"Tag '{tag}' added {len(tag_datasets)} datasets")
+
+    return list(all_dataset_ids)
+
+def detect_coordinate_columns(headers: List[str]) -> Dict[str, Optional[str]]:
+    """Detect latitude and longitude columns in CSV headers"""
+    headers_lower = [h.lower().strip() for h in headers]
+
+    lat_patterns = ['lat', 'latitude', 'breitengrad', 'y', 'northing']
+    lon_patterns = ['lon', 'lng', 'longitude', 'laengengrad', 'längengrad', 'x', 'easting']
+
+    lat_col = None
+    lon_col = None
+
+    # Try to find exact matches first
+    for i, h in enumerate(headers_lower):
+        if not lat_col:
+            for pattern in lat_patterns:
+                if pattern == h or h.startswith(pattern):
+                    lat_col = headers[i]
+                    break
+
+        if not lon_col:
+            for pattern in lon_patterns:
+                if pattern == h or h.startswith(pattern):
+                    lon_col = headers[i]
+                    break
+
+    # Try partial matches if exact matches not found
+    if not lat_col or not lon_col:
+        for i, h in enumerate(headers_lower):
+            if not lat_col:
+                for pattern in lat_patterns:
+                    if pattern in h:
+                        lat_col = headers[i]
+                        break
+
+            if not lon_col:
+                for pattern in lon_patterns:
+                    if pattern in h:
+                        lon_col = headers[i]
+                        break
+
+    return {'lat': lat_col, 'lon': lon_col}
+
+def csv_to_geojson(csv_content: str, package_id: str) -> Dict[str, Any]:
+    """Convert CSV content to GeoJSON format"""
+    try:
+        # Parse CSV
+        reader = csv.DictReader(io.StringIO(csv_content))
+        rows = list(reader)
+
+        if not rows:
+            return {"type": "FeatureCollection", "features": []}
+
+        # Detect coordinate columns
+        headers = list(rows[0].keys())
+        coords = detect_coordinate_columns(headers)
+
+        if not coords['lat'] or not coords['lon']:
+            print(f"No coordinate columns found in CSV. Headers: {headers}")
+            return {"type": "FeatureCollection", "features": []}
+
+        print(f"Detected coordinates - Lat: {coords['lat']}, Lon: {coords['lon']}")
+
+        # Convert rows to GeoJSON features
+        features = []
+        for row in rows:
+            try:
+                lat_str = row.get(coords['lat'], '').strip()
+                lon_str = row.get(coords['lon'], '').strip()
+
+                if not lat_str or not lon_str:
+                    continue
+
+                # Parse coordinates
+                lat = float(lat_str.replace(',', '.'))
+                lon = float(lon_str.replace(',', '.'))
+
+                # Create properties (exclude coordinate columns)
+                properties = {k: v for k, v in row.items() if k not in [coords['lat'], coords['lon']]}
+
+                feature = {
+                    "type": "Feature",
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [lon, lat]
+                    },
+                    "properties": properties
+                }
+
+                features.append(feature)
+            except (ValueError, AttributeError) as e:
+                # Skip rows with invalid coordinates
+                continue
+
+        print(f"Converted {len(features)} CSV rows to GeoJSON features")
+
+        return {
+            "type": "FeatureCollection",
+            "features": features
+        }
+
+    except Exception as e:
+        print(f"Error converting CSV to GeoJSON: {e}")
+        return {"type": "FeatureCollection", "features": []}
 
 @lru_cache(maxsize=None)
 def fetch_ckan_dataset(package_id: str) -> Dict[str, Any]:
@@ -164,41 +352,47 @@ def fetch_ckan_dataset(package_id: str) -> Dict[str, Any]:
             print(f"API returned unsuccessful response for {package_id}")
             return {"type": "FeatureCollection", "features": []}
 
-        # Find GeoJSON resource
+        # Find geographic data resource (GeoJSON, JSON, or CSV)
         resources = package_data.get('result', {}).get('resources', [])
-        geojson_resource = None
+        data_resource = None
+        resource_format = None
 
-        # Try to find GeoJSON format first, fall back to other formats
-        for resource in resources:
-            resource_format = resource.get('format', '').lower()
-            if resource_format == 'geojson':
-                geojson_resource = resource
+        # Priority order: GeoJSON > JSON > CSV
+        format_priority = ['geojson', 'json', 'csv']
+
+        for fmt in format_priority:
+            for resource in resources:
+                if resource.get('format', '').lower() == fmt:
+                    data_resource = resource
+                    resource_format = fmt
+                    break
+            if data_resource:
                 break
 
-        # If no GeoJSON found, try JSON
-        if not geojson_resource:
-            for resource in resources:
-                resource_format = resource.get('format', '').lower()
-                if resource_format == 'json':
-                    geojson_resource = resource
-                    break
-
-        if not geojson_resource:
-            print(f"No GeoJSON/JSON resource found for {package_id}")
+        if not data_resource:
+            print(f"No GeoJSON/JSON/CSV resource found for {package_id}")
             print(f"Available formats: {[r.get('format') for r in resources]}")
             return {"type": "FeatureCollection", "features": []}
 
-        # Download GeoJSON data
-        data_url = geojson_resource.get('url')
+        # Download data
+        data_url = data_resource.get('url')
         if not data_url:
-            print(f"No URL found for GeoJSON resource in {package_id}")
+            print(f"No URL found for resource in {package_id}")
             return {"type": "FeatureCollection", "features": []}
 
-        print(f"Downloading GeoJSON from: {data_url}")
+        print(f"Downloading {resource_format.upper()} from: {data_url}")
         data_response = requests.get(data_url, timeout=30)
         data_response.raise_for_status()
 
-        geojson_data = data_response.json()
+        # Parse based on format
+        if resource_format == 'csv':
+            # Handle CSV format
+            csv_content = data_response.text
+            geojson_data = csv_to_geojson(csv_content, package_id)
+        else:
+            # Handle GeoJSON/JSON formats
+            geojson_data = data_response.json()
+
         return geojson_data
 
     except requests.exceptions.RequestException as e:
@@ -285,21 +479,23 @@ def get_workspaces():
 
 @app.route('/api/workspaces', methods=['POST'])
 def create_new_workspace():
-    """Create a new workspace"""
+    """Create a new workspace with datasets, groups, and/or tags"""
     try:
         data = request.get_json()
 
         name = data.get('name')
         dataset_ids = data.get('dataset_ids', [])
+        groups = data.get('groups', [])
+        tags = data.get('tags', [])
         description = data.get('description', '')
 
         if not name:
             return jsonify({'error': 'Workspace name is required'}), 400
 
-        if not dataset_ids:
-            return jsonify({'error': 'At least one dataset ID is required'}), 400
+        if not dataset_ids and not groups and not tags:
+            return jsonify({'error': 'At least one dataset ID, group, or tag is required'}), 400
 
-        workspace = create_workspace(name, dataset_ids, description)
+        workspace = create_workspace(name, dataset_ids, groups, tags, description)
         return jsonify(workspace), 201
 
     except Exception as e:
@@ -329,9 +525,11 @@ def update_existing_workspace(workspace_id):
 
         name = data.get('name')
         dataset_ids = data.get('dataset_ids')
+        groups = data.get('groups')
+        tags = data.get('tags')
         description = data.get('description')
 
-        workspace = update_workspace(workspace_id, name, dataset_ids, description)
+        workspace = update_workspace(workspace_id, name, dataset_ids, groups, tags, description)
 
         if not workspace:
             return jsonify({'error': 'Workspace not found'}), 404
@@ -366,7 +564,8 @@ def load_workspace_data(workspace_id):
         if not workspace:
             return jsonify({'error': 'Workspace not found'}), 404
 
-        dataset_ids = workspace['dataset_ids']
+        # Resolve all dataset IDs from direct IDs, groups, and tags
+        dataset_ids = resolve_workspace_datasets(workspace)
 
         # Fetch all datasets
         loaded_data = []
@@ -404,7 +603,7 @@ def load_workspace_data(workspace_id):
 
 @app.route('/api/workspaces/<workspace_id>/search', methods=['GET'])
 def search_workspace(workspace_id):
-    """Search within a workspace's datasets"""
+    """Search within a workspace's datasets with result limiting"""
     try:
         workspace = get_workspace_by_id(workspace_id)
 
@@ -414,10 +613,19 @@ def search_workspace(workspace_id):
         query = request.args.get('q', '')
         lat = request.args.get('lat', type=float)
         lon = request.args.get('lon', type=float)
+        limit = request.args.get('limit', 500, type=int)  # Default limit: 500 features
+        offset = request.args.get('offset', 0, type=int)  # Default offset: 0
+        max_per_dataset = request.args.get('max_per_dataset', 200, type=int)  # Max features per dataset
 
-        print(f"Searching workspace '{workspace['name']}' - Query: '{query}', Lat: {lat}, Lon: {lon}")
+        # Cap limits to prevent abuse
+        limit = min(limit, 2000)
+        max_per_dataset = min(max_per_dataset, 500)
 
-        dataset_ids = workspace['dataset_ids']
+        print(f"Searching workspace '{workspace['name']}' - Query: '{query}', Limit: {limit}, Offset: {offset}")
+
+        # Resolve all dataset IDs from direct IDs, groups, and tags
+        dataset_ids = resolve_workspace_datasets(workspace)
+        print(f"Resolved {len(dataset_ids)} datasets from workspace")
 
         # Fetch dataset metadata for titles
         dataset_metadata = {}
@@ -436,12 +644,23 @@ def search_workspace(workspace_id):
                 print(f"Error fetching metadata for {dataset_id}: {e}")
                 dataset_metadata[dataset_id] = {'title': dataset_id, 'name': ''}
 
-        # Load all datasets from workspace
+        # Load datasets with per-dataset limiting
         all_features = []
+        total_features_available = 0
+
         for dataset_id in dataset_ids:
             try:
                 geojson_data = fetch_ckan_dataset(dataset_id)
                 features = geojson_data.get('features', [])
+
+                total_features_available += len(features)
+
+                # Limit features per dataset to prevent one dataset from dominating
+                if len(features) > max_per_dataset:
+                    print(f"Dataset {dataset_id} has {len(features)} features, sampling {max_per_dataset}")
+                    # Sample evenly distributed features
+                    step = len(features) / max_per_dataset
+                    features = [features[int(i * step)] for i in range(max_per_dataset)]
 
                 # Add dataset_id to each feature
                 for feature in features:
@@ -451,7 +670,7 @@ def search_workspace(workspace_id):
             except Exception as e:
                 print(f"Error loading dataset {dataset_id}: {e}")
 
-        print(f"Total features loaded from workspace: {len(all_features)}")
+        print(f"Total features loaded from workspace: {len(all_features)} (available: {total_features_available})")
 
         # Search through features
         results = search_features(all_features, query)
@@ -476,13 +695,24 @@ def search_workspace(workspace_id):
             # Sort by distance
             results = sorted(results, key=lambda x: x.get('distance_km', float('inf')))
 
+        # Apply pagination (offset and limit)
+        total_results = len(results)
+        paginated_results = results[offset:offset + limit]
+
+        print(f"Returning {len(paginated_results)} results (total: {total_results}, offset: {offset}, limit: {limit})")
+
         return jsonify({
             'workspace_id': workspace_id,
             'workspace_name': workspace['name'],
             'query': query,
-            'count': len(results),
-            'results': results,
-            'dataset_metadata': dataset_metadata
+            'total': total_results,
+            'count': len(paginated_results),
+            'offset': offset,
+            'limit': limit,
+            'has_more': (offset + limit) < total_results,
+            'results': paginated_results,
+            'dataset_metadata': dataset_metadata,
+            'total_features_available': total_features_available
         })
 
     except Exception as e:
@@ -582,6 +812,100 @@ def search_datasets():
         return jsonify({'suggestions': []})
 
 # ============================================================================
+# Groups and Tags Endpoints
+# ============================================================================
+
+@app.route('/api/groups', methods=['GET'])
+def list_groups():
+    """List all available groups from CKAN"""
+    try:
+        groups_url = f"{CKAN_API_BASE}/group_list"
+        params = {'all_fields': True}
+
+        response = requests.get(groups_url, params=params, timeout=10)
+        response.raise_for_status()
+
+        data = response.json()
+
+        if not data.get('success'):
+            return jsonify({'error': 'CKAN API returned unsuccessful response'}), 500
+
+        groups = data.get('result', [])
+
+        formatted_groups = []
+        for group in groups:
+            formatted_groups.append({
+                'id': group.get('id'),
+                'name': group.get('name'),
+                'title': group.get('title') or group.get('display_name'),
+                'description': group.get('description', ''),
+                'package_count': group.get('package_count', 0)
+            })
+
+        return jsonify({
+            'count': len(formatted_groups),
+            'groups': formatted_groups
+        })
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching groups: {e}")
+        return jsonify({'error': str(e)}), 500
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/tags', methods=['GET'])
+def list_tags():
+    """List popular tags from CKAN"""
+    try:
+        # Get package search to extract tags
+        search_url = f"{CKAN_API_BASE}/package_search"
+        params = {
+            'rows': 1000,
+            'fl': 'tags'
+        }
+
+        response = requests.get(search_url, params=params, timeout=10)
+        response.raise_for_status()
+
+        data = response.json()
+
+        if not data.get('success'):
+            return jsonify({'error': 'CKAN API returned unsuccessful response'}), 500
+
+        # Collect all tags
+        tag_counts = {}
+        datasets = data.get('result', {}).get('results', [])
+
+        for dataset in datasets:
+            tags = dataset.get('tags', [])
+            for tag in tags:
+                tag_name = tag.get('name') if isinstance(tag, dict) else tag
+                if tag_name:
+                    tag_counts[tag_name] = tag_counts.get(tag_name, 0) + 1
+
+        # Format tags sorted by frequency
+        formatted_tags = [
+            {
+                'name': tag,
+                'count': count
+            }
+            for tag, count in sorted(tag_counts.items(), key=lambda x: x[1], reverse=True)
+        ]
+
+        return jsonify({
+            'count': len(formatted_tags),
+            'tags': formatted_tags
+        })
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching tags: {e}")
+        return jsonify({'error': str(e)}), 500
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+# ============================================================================
 # General Endpoints
 # ============================================================================
 
@@ -623,11 +947,11 @@ def index():
     """Root endpoint with API documentation"""
     return jsonify({
         'message': 'Munich City Data Search API - CKAN Integration with Workspaces',
-        'version': '3.0.0',
+        'version': '4.0.0',
         'endpoints': {
             'workspaces': {
                 'GET /api/workspaces': 'List all workspaces',
-                'POST /api/workspaces': 'Create new workspace (body: {name, dataset_ids, description})',
+                'POST /api/workspaces': 'Create new workspace (body: {name, dataset_ids?, groups?, tags?, description?})',
                 'GET /api/workspaces/<id>': 'Get workspace details',
                 'PUT /api/workspaces/<id>': 'Update workspace',
                 'DELETE /api/workspaces/<id>': 'Delete workspace',
@@ -638,6 +962,10 @@ def index():
                 'GET /api/datasets': 'List all available datasets (params: q, limit)',
                 'GET /api/datasets/search': 'Search datasets for autocomplete (params: q)'
             },
+            'groups_and_tags': {
+                'GET /api/groups': 'List all available CKAN groups',
+                'GET /api/tags': 'List all available CKAN tags'
+            },
             'general': {
                 'GET /api/stats': 'Get statistics',
                 'GET /api/health': 'Health check'
@@ -645,7 +973,8 @@ def index():
         },
         'data_source': 'Open Data München (CKAN API)',
         'features': [
-            'Workspace-based dataset management',
+            'Workspace-based dataset management with groups and tags support',
+            'Automatic dataset resolution from groups and tags',
             'Persistent storage with SQLite',
             'Multi-frontend support',
             'Shareable workspace URLs'
