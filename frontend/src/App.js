@@ -6,43 +6,26 @@ import './App.css';
 const API_URL = `http://${window.location.hostname}:5001/api`;
 
 function App() {
-  // Workspace management
-  const [workspaces, setWorkspaces] = useState([]);
-  const [selectedWorkspace, setSelectedWorkspace] = useState(null);
-  const [showCreateWorkspace, setShowCreateWorkspace] = useState(false);
+  const [stats, setStats] = useState(null);
 
-  // Dataset search for workspace creation
+  // Dataset selection
   const [datasetSearch, setDatasetSearch] = useState('');
-  const [datasetSuggestions, setDatasetSuggestions] = useState([]);
+  const [suggestions, setSuggestions] = useState([]);
   const [selectedDatasets, setSelectedDatasets] = useState([]);
-  const [newWorkspaceName, setNewWorkspaceName] = useState('');
-  const [newWorkspaceDesc, setNewWorkspaceDesc] = useState('');
 
-  // Search within workspace
+  // Search
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [stats, setStats] = useState(null);
   const [datasetMetadata, setDatasetMetadata] = useState({});
+  const [loading, setLoading] = useState(false);
 
-  // UI state
-  const [viewMode, setViewMode] = useState('list'); // 'list' or 'map'
-  const [sidebarVisible, setSidebarVisible] = useState(true);
-  const [displayLimit, setDisplayLimit] = useState(20); // Limit results in list view
+  // View
+  const [viewMode, setViewMode] = useState('map');
+  const [displayLimit, setDisplayLimit] = useState(20);
 
   useEffect(() => {
-    loadWorkspaces();
     loadStats();
   }, []);
-
-  const loadWorkspaces = async () => {
-    try {
-      const response = await axios.get(`${API_URL}/workspaces`);
-      setWorkspaces(response.data.workspaces);
-    } catch (error) {
-      console.error('Error loading workspaces:', error);
-    }
-  };
 
   const loadStats = async () => {
     try {
@@ -55,15 +38,12 @@ function App() {
 
   const searchDatasets = async (query) => {
     if (query.length < 2) {
-      setDatasetSuggestions([]);
+      setSuggestions([]);
       return;
     }
-
     try {
-      const response = await axios.get(`${API_URL}/datasets/search`, {
-        params: { q: query }
-      });
-      setDatasetSuggestions(response.data.suggestions);
+      const response = await axios.get(`${API_URL}/datasets/search`, { params: { q: query } });
+      setSuggestions(response.data.suggestions);
     } catch (error) {
       console.error('Error searching datasets:', error);
     }
@@ -74,353 +54,161 @@ function App() {
       setSelectedDatasets([...selectedDatasets, dataset]);
     }
     setDatasetSearch('');
-    setDatasetSuggestions([]);
+    setSuggestions([]);
   };
 
   const removeDataset = (datasetId) => {
     setSelectedDatasets(selectedDatasets.filter(d => d.id !== datasetId));
   };
 
-  const createWorkspace = async () => {
-    if (!newWorkspaceName || selectedDatasets.length === 0) {
-      alert('Please provide a workspace name and select at least one dataset');
+  const performSearch = useCallback(async () => {
+    if (selectedDatasets.length === 0) {
+      setSearchResults([]);
       return;
     }
 
-    try {
-      const response = await axios.post(`${API_URL}/workspaces`, {
-        name: newWorkspaceName,
-        description: newWorkspaceDesc,
-        dataset_ids: selectedDatasets.map(d => d.id)
-      });
-
-      setWorkspaces([response.data, ...workspaces]);
-      setSelectedWorkspace(response.data);
-      setShowCreateWorkspace(false);
-      setNewWorkspaceName('');
-      setNewWorkspaceDesc('');
-      setSelectedDatasets([]);
-    } catch (error) {
-      console.error('Error creating workspace:', error);
-      alert('Error creating workspace');
-    }
-  };
-
-  const deleteWorkspace = async (workspaceId) => {
-    if (!window.confirm('Delete this workspace?')) return;
-
-    try {
-      await axios.delete(`${API_URL}/workspaces/${workspaceId}`);
-      setWorkspaces(workspaces.filter(w => w.id !== workspaceId));
-      if (selectedWorkspace?.id === workspaceId) {
-        setSelectedWorkspace(null);
-        setSearchResults([]);
-      }
-    } catch (error) {
-      console.error('Error deleting workspace:', error);
-    }
-  };
-
-  const searchInWorkspace = useCallback(async () => {
-    if (!selectedWorkspace) return;
-
     setLoading(true);
-    setDisplayLimit(20); // Reset display limit on new search
+    setDisplayLimit(20);
+
     try {
-      const response = await axios.get(
-        `${API_URL}/workspaces/${selectedWorkspace.id}/search`,
-        { params: { q: searchQuery } }
-      );
-      const results = response.data.results;
-      setSearchResults(results);
+      const params = new URLSearchParams();
+      params.append('q', searchQuery);
+      selectedDatasets.forEach(d => params.append('datasets', d.id));
+
+      const response = await axios.get(`${API_URL}/search?${params.toString()}`);
+      setSearchResults(response.data.results || []);
       setDatasetMetadata(response.data.dataset_metadata || {});
 
-      // Auto-switch to map view if geodata is available
-      const hasGeodata = results.some(r => r.geometry && r.geometry.coordinates);
-      if (hasGeodata) {
-        setViewMode('map');
-      } else {
-        setViewMode('list');
-      }
+      const hasGeodata = (response.data.results || []).some(r => r.geometry?.coordinates);
+      setViewMode(hasGeodata ? 'map' : 'list');
     } catch (error) {
-      console.error('Error searching workspace:', error);
+      console.error('Error searching:', error);
       setSearchResults([]);
-      setDatasetMetadata({});
     } finally {
       setLoading(false);
     }
-  }, [selectedWorkspace, searchQuery]);
+  }, [selectedDatasets, searchQuery]);
 
   useEffect(() => {
-    if (selectedWorkspace && searchQuery !== undefined) {
-      const timer = setTimeout(searchInWorkspace, 300);
+    if (selectedDatasets.length > 0) {
+      const timer = setTimeout(performSearch, 300);
       return () => clearTimeout(timer);
     }
-  }, [searchQuery, selectedWorkspace, searchInWorkspace]);
+  }, [searchQuery, selectedDatasets, performSearch]);
 
-  // Prepare results for MapView (add category field from dataset_id)
   const mapResults = searchResults.map(result => ({
     ...result,
     category: result.dataset_id || 'unknown'
   }));
 
   return (
-    <div className="app-container">
-      <header className="app-header">
-        <div className="header-content">
-          <button
-            className="sidebar-toggle"
-            onClick={() => setSidebarVisible(!sidebarVisible)}
-            title={sidebarVisible ? 'Hide sidebar' : 'Show sidebar'}
-          >
-            {sidebarVisible ? '◀' : '▶'}
-          </button>
-          <h1>Munich Open Data</h1>
-          {stats && (
-            <div className="stats">
-              {stats.total_datasets} datasets · {stats.total_workspaces} workspaces
+    <div className="app">
+      <header className="header">
+        <h1>Munich Open Data</h1>
+        {stats && <span className="stat">{stats.total_datasets} datasets available</span>}
+      </header>
+
+      <div className="controls">
+        <div className="dataset-picker">
+          <input
+            type="text"
+            placeholder="Add datasets to search..."
+            value={datasetSearch}
+            onChange={(e) => {
+              setDatasetSearch(e.target.value);
+              searchDatasets(e.target.value);
+            }}
+          />
+          {suggestions.length > 0 && (
+            <div className="dropdown">
+              {suggestions.map(dataset => (
+                <div key={dataset.id} className="dropdown-item" onClick={() => addDataset(dataset)}>
+                  {dataset.title}
+                </div>
+              ))}
             </div>
           )}
         </div>
-      </header>
 
-      <div className="app-content">
-        {/* Sidebar */}
-        <aside className={`sidebar ${!sidebarVisible ? 'hidden' : ''}`}>
-          <div className="sidebar-header">
-            <h2>Workspaces</h2>
-            <button onClick={() => setShowCreateWorkspace(!showCreateWorkspace)}>
-              {showCreateWorkspace ? '✕' : '+'}
-            </button>
-          </div>
-
-          {showCreateWorkspace && (
-            <div className="create-workspace">
-              <input
-                type="text"
-                placeholder="Workspace name"
-                value={newWorkspaceName}
-                onChange={(e) => setNewWorkspaceName(e.target.value)}
-              />
-              <textarea
-                placeholder="Description (optional)"
-                value={newWorkspaceDesc}
-                onChange={(e) => setNewWorkspaceDesc(e.target.value)}
-                rows={2}
-              />
-
-              <div className="dataset-search">
-                <input
-                  type="text"
-                  placeholder="Search datasets..."
-                  value={datasetSearch}
-                  onChange={(e) => {
-                    setDatasetSearch(e.target.value);
-                    searchDatasets(e.target.value);
-                  }}
-                />
-                {datasetSuggestions.length > 0 && (
-                  <div className="suggestions">
-                    {datasetSuggestions.map(dataset => (
-                      <div
-                        key={dataset.id}
-                        className="suggestion"
-                        onClick={() => addDataset(dataset)}
-                      >
-                        {dataset.title}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {selectedDatasets.length > 0 && (
-                <div className="selected-datasets">
-                  {selectedDatasets.map(dataset => (
-                    <div key={dataset.id} className="dataset-chip">
-                      {dataset.title}
-                      <button onClick={() => removeDataset(dataset.id)}>✕</button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <button className="create-btn" onClick={createWorkspace}>
-                Create Workspace
-              </button>
-            </div>
-          )}
-
-          <div className="workspace-list">
-            {workspaces.map(workspace => (
-              <div
-                key={workspace.id}
-                className={`workspace-item ${selectedWorkspace?.id === workspace.id ? 'active' : ''}`}
-              >
-                <div
-                  className="workspace-info"
-                  onClick={() => {
-                    setSelectedWorkspace(workspace);
-                    setSearchResults([]);
-                    setSearchQuery('');
-                  }}
-                >
-                  <div className="workspace-name">{workspace.name}</div>
-                  <div className="workspace-meta">
-                    {workspace.dataset_ids.length} dataset{workspace.dataset_ids.length !== 1 ? 's' : ''}
-                  </div>
-                </div>
-                <button
-                  className="delete-btn"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    deleteWorkspace(workspace.id);
-                  }}
-                >
-                  🗑
-                </button>
-              </div>
+        {selectedDatasets.length > 0 && (
+          <div className="chips">
+            {selectedDatasets.map(dataset => (
+              <span key={dataset.id} className="chip">
+                {dataset.title}
+                <button onClick={() => removeDataset(dataset.id)}>&times;</button>
+              </span>
             ))}
           </div>
-        </aside>
+        )}
 
-        {/* Main content */}
-        <main className="main-content">
-          {selectedWorkspace ? (
-            <>
-              <div className="search-section">
-                <div className="search-header">
-                  <h2>{selectedWorkspace.name}</h2>
-                  <div className="view-toggle">
-                    <button
-                      className={viewMode === 'list' ? 'active' : ''}
-                      onClick={() => setViewMode('list')}
-                    >
-                      List
-                    </button>
-                    <button
-                      className={viewMode === 'map' ? 'active' : ''}
-                      onClick={() => setViewMode('map')}
-                    >
-                      Map
-                    </button>
-                  </div>
-                </div>
-                {selectedWorkspace.description && (
-                  <p className="workspace-description">{selectedWorkspace.description}</p>
-                )}
-                <input
-                  type="text"
-                  className="search-input"
-                  placeholder="Search within workspace..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
-
-              {loading ? (
-                <div className="loading">Loading...</div>
-              ) : viewMode === 'map' ? (
-                <div className="map-container-wrapper">
-                  <MapView results={mapResults} datasetMetadata={datasetMetadata} />
-                </div>
-              ) : (
-                <div className="results">
-                  <div className="results-header">
-                    {searchResults.length} result{searchResults.length !== 1 ? 's' : ''}
-                    {searchResults.length > displayLimit && (
-                      <span style={{ marginLeft: '0.5rem', color: '#999', fontSize: '0.85rem' }}>
-                        (showing {displayLimit})
-                      </span>
-                    )}
-                  </div>
-                  <div className="results-list">
-                    {searchResults.slice(0, displayLimit).map((result, idx) => {
-                      const metadata = datasetMetadata[result.dataset_id];
-                      const datasetName = metadata?.title || result.dataset_id;
-
-                      // Filter properties: exclude technical fields, empty values, and very long strings
-                      const filteredProperties = Object.entries(result.properties || {})
-                        .filter(([key, value]) => {
-                          if (!value) return false;
-                          const keyLower = key.toLowerCase();
-                          // Exclude technical/system fields
-                          if (keyLower.includes('objectid') ||
-                              keyLower.includes('shape') ||
-                              keyLower.includes('coord') ||
-                              keyLower.includes('geometry') ||
-                              keyLower.includes('fid')) {
-                            return false;
-                          }
-                          // Exclude very long strings
-                          const valueStr = String(value);
-                          if (valueStr.length > 200) return false;
-                          return true;
-                        })
-                        .slice(0, 6); // Limit to 6 properties
-
-                      return (
-                        <div key={idx} className="result-item">
-                          <div className="result-dataset" style={{
-                            fontSize: '0.85rem',
-                            color: '#667eea',
-                            fontWeight: '600',
-                            marginBottom: '0.5rem'
-                          }}>
-                            {datasetName}
-                          </div>
-                          <div className="result-properties">
-                            {filteredProperties.map(([key, value]) => (
-                              <div key={key} className="property">
-                                <span className="property-key">{key.replace(/_/g, ' ')}:</span>
-                                <span className="property-value">{String(value)}</span>
-                              </div>
-                            ))}
-                          </div>
-                          {result.distance_km && (
-                            <div className="result-distance">{result.distance_km} km</div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                  {searchResults.length > displayLimit && (
-                    <div style={{
-                      textAlign: 'center',
-                      padding: '1rem',
-                      marginTop: '0.5rem'
-                    }}>
-                      <button
-                        onClick={() => setDisplayLimit(prev => prev + 20)}
-                        style={{
-                          padding: '0.75rem 1.5rem',
-                          background: '#667eea',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          fontSize: '0.9rem',
-                          fontWeight: '500',
-                          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                        }}
-                        onMouseOver={(e) => e.target.style.background = '#5568d3'}
-                        onMouseOut={(e) => e.target.style.background = '#667eea'}
-                      >
-                        Show More ({searchResults.length - displayLimit} remaining)
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="empty-state">
-              <h2>Welcome to Munich Open Data</h2>
-              <p>Select a workspace or create a new one to get started</p>
+        {selectedDatasets.length > 0 && (
+          <div className="search-row">
+            <input
+              type="text"
+              className="search-input"
+              placeholder="Search within selected datasets..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <div className="view-toggle">
+              <button className={viewMode === 'list' ? 'active' : ''} onClick={() => setViewMode('list')}>List</button>
+              <button className={viewMode === 'map' ? 'active' : ''} onClick={() => setViewMode('map')}>Map</button>
             </div>
-          )}
-        </main>
+          </div>
+        )}
       </div>
+
+      <main className="content">
+        {selectedDatasets.length === 0 ? (
+          <div className="empty">
+            <p>Search and add datasets above to get started</p>
+          </div>
+        ) : loading ? (
+          <div className="loading">Loading...</div>
+        ) : viewMode === 'map' ? (
+          <MapView results={mapResults} datasetMetadata={datasetMetadata} />
+        ) : (
+          <div className="results">
+            <div className="results-count">
+              {searchResults.length} results
+              {searchResults.length > displayLimit && ` (showing ${displayLimit})`}
+            </div>
+            <div className="results-list">
+              {searchResults.slice(0, displayLimit).map((result, idx) => {
+                const meta = datasetMetadata[result.dataset_id];
+                const filteredProps = Object.entries(result.properties || {})
+                  .filter(([key, value]) => {
+                    if (!value) return false;
+                    const k = key.toLowerCase();
+                    if (k.includes('objectid') || k.includes('shape') || k.includes('coord') || k.includes('geometry') || k.includes('fid')) return false;
+                    if (String(value).length > 200) return false;
+                    return true;
+                  })
+                  .slice(0, 6);
+
+                return (
+                  <div key={idx} className="result-card">
+                    <div className="result-source">{meta?.title || result.dataset_id}</div>
+                    <div className="result-props">
+                      {filteredProps.map(([key, value]) => (
+                        <div key={key} className="prop">
+                          <span className="prop-key">{key.replace(/_/g, ' ')}:</span>
+                          <span className="prop-value">{String(value)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {searchResults.length > displayLimit && (
+              <button className="load-more" onClick={() => setDisplayLimit(prev => prev + 20)}>
+                Load more ({searchResults.length - displayLimit} remaining)
+              </button>
+            )}
+          </div>
+        )}
+      </main>
     </div>
   );
 }

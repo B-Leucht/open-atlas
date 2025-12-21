@@ -1,37 +1,13 @@
 .map-view-wrapper {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  position: relative;
   width: 100%;
   height: 100%;
+  min-height: 400px;
 }
 
 .map-container {
-  position: absolute !important;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
   width: 100% !important;
   height: 100% !important;
-}
-
-.map-notice {
-  position: absolute;
-  bottom: 60px;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 0.5rem 1rem;
-  background: rgba(255, 243, 205, 0.95);
-  color: #856404;
-  text-align: center;
-  font-size: 0.85rem;
-  border-radius: 6px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-  z-index: 1000;
-  pointer-events: none;
 }
 
 .map-info {
@@ -43,53 +19,40 @@
   background: rgba(255, 255, 255, 0.95);
   color: #666;
   text-align: center;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   border-radius: 6px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-  backdrop-filter: blur(10px);
   z-index: 1000;
   pointer-events: none;
 }
 
 .no-map-results {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
   text-align: center;
-  padding: 3rem;
-  background: white;
-  border-radius: 10px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+  padding: 2rem;
+  color: #888;
 }
 
 .no-map-results h3 {
-  color: #333;
   margin-bottom: 0.5rem;
 }
 
-.no-map-results p {
-  color: #666;
-}
-
 .popup-content {
-  min-width: 200px;
+  min-width: 180px;
 }
 
 .popup-category {
   margin-bottom: 0.5rem;
-  font-size: 0.9rem;
-  text-transform: uppercase;
+  font-size: 0.85rem;
 }
 
 .popup-properties {
-  font-size: 0.85rem;
-  line-height: 1.6;
-}
-
-.popup-properties strong {
-  color: #555;
-  text-transform: capitalize;
+  font-size: 0.8rem;
+  line-height: 1.5;
 }
 
 .custom-marker {
@@ -98,91 +61,61 @@
 }
 
 .leaflet-container {
-  position: absolute !important;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
   width: 100% !important;
   height: 100% !important;
-  z-index: 1;
 }
 
 /* Layer control styling */
 .leaflet-control-layers {
-  background: rgba(255, 255, 255, 0.97) !important;
-  backdrop-filter: blur(10px);
-  border-radius: 8px !important;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.2) !important;
+  background: rgba(255, 255, 255, 0.95) !important;
+  border-radius: 6px !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important;
   padding: 0 !important;
-  border: 1px solid rgba(0,0,0,0.1) !important;
-  min-width: 220px;
-  max-height: 500px;
-  overflow: visible !important;
+  border: 1px solid #ddd !important;
+  min-width: 200px;
+  max-height: 300px;
+  overflow-y: auto !important;
 }
 
 .leaflet-control-layers-expanded {
-  padding: 12px !important;
+  padding: 8px !important;
 }
 
 .leaflet-control-layers-toggle {
   display: none !important;
 }
 
-.leaflet-control-layers-base {
-  display: none;
-}
-
+.leaflet-control-layers-base,
 .leaflet-control-layers-separator {
   display: none;
-}
-
-.leaflet-control-layers-overlays {
-  padding: 0 !important;
 }
 
 .leaflet-control-layers label {
   display: flex !important;
   align-items: center;
-  padding: 8px 12px !important;
+  padding: 6px 8px !important;
   margin: 0 !important;
-  font-size: 0.875rem !important;
-  font-weight: 500;
-  color: #333;
+  font-size: 0.8rem !important;
   cursor: pointer;
   border-radius: 4px;
-  transition: background 0.2s;
 }
 
 .leaflet-control-layers label:hover {
-  background: rgba(102, 126, 234, 0.08);
+  background: #f5f5f5;
 }
 
 .leaflet-control-layers-overlays label input[type="checkbox"] {
-  margin-right: 10px !important;
-  width: 16px;
-  height: 16px;
+  margin-right: 8px !important;
   cursor: pointer;
-  accent-color: #667eea;
+  accent-color: #0066cc;
 }
 
-.leaflet-control-layers-overlays label span {
-  flex: 1;
-  line-height: 1.4;
-}
-
-/* Color the first character (circle) of each label */
-.leaflet-control-layers label::first-line {
-  font-size: 1.2em;
-}
-
-/* Add color indicator before checkbox */
 .leaflet-control-layers-overlays label::before {
   content: '';
-  width: 14px;
-  height: 14px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
-  margin-right: 10px;
+  margin-right: 8px;
   flex-shrink: 0;
   background: var(--layer-color, #999);
   border: 2px solid white;
