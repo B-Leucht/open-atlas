@@ -104,3 +104,46 @@ elasticsearch-data/
 # Backend specific
 backend/venv/
 workspaces.db
+
+# Chatbot-backend specific artifacts
+# Virtual environments and environment files for the chatbot backend
+/backend/chatbot-backend/.venv/
+/backend/chatbot-backend/venv/
+/backend/chatbot-backend/env/
+/backend/chatbot-backend/.env
+/backend/chatbot-backend/.env.local
+/backend/chatbot-backend/.env.*.local
+
+# ChromaDB persistence and related data directories
+/backend/chatbot-backend/.chroma/
+/backend/chatbot-backend/.chromadb/
+/backend/chatbot-backend/data.ms/
+/backend/chatbot-backend/elasticsearch-data/
+
+# DuckDB and other local database files that may be created during ingestion/analysis
+/backend/chatbot-backend/*.db
+/backend/chatbot-backend/*.sqlite
+/backend/chatbot-backend/*.sqlite3
+/backend/chatbot-backend/*.duckdb
+
+# Python/pytest/mypy caches and other runtime artifacts
+/backend/chatbot-backend/__pycache__/
+/backend/chatbot-backend/.pytest_cache/
+/backend/chatbot-backend/.coverage
+/backend/chatbot-backend/.mypy_cache/
+
+# Streamlit, logs and temporary files
+/backend/chatbot-backend/.streamlit/
+/backend/chatbot-backend/*.log
+/backend/chatbot-backend/.DS_Store
+
+# Editor / OS files
+/backend/chatbot-backend/.idea/
+/backend/chatbot-backend/.vscode/
+
+# Node/npm artifacts (if the chatbot backend ever uses node tooling)
+/backend/chatbot-backend/node_modules/
+
+# General data/cache directories (already generally ignored but make explicit for this subproject)
+/backend/chatbot-backend/data/
+/backend/chatbot-backend/cache/
