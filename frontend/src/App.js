@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import MapView from './components/MapView';
+import Chatbot from './components/Chatbot';
 import './App.css';
 
 const API_URL = `http://${window.location.hostname}:5001/api`;
@@ -171,7 +172,7 @@ function App() {
           <div className="results">
             <div className="results-count">
               {searchResults.length} results
-              {searchResults.length > displayLimit && ` (showing ${displayLimit})`}
+            {searchResults.length > displayLimit && ` (showing ${displayLimit})`}
             </div>
             <div className="results-list">
               {searchResults.slice(0, displayLimit).map((result, idx) => {
@@ -209,6 +210,8 @@ function App() {
           </div>
         )}
       </main>
+
+      <Chatbot />
     </div>
   );
 }
