@@ -7,7 +7,7 @@ This project implements a local, agentic RAG chatbot for the Munich Open Data po
 1. **Create and activate a virtual environment** (optional but recommended):
 
 ```bash
-cd "/Users/david.porochyn/Uni/TUM /Public sector/OpenDataLLM"
+cd path/to/your/clone/backend/chatbot-backend
 python -m venv .venv
 source .venv/bin/activate  # on macOS/Linux
 ```

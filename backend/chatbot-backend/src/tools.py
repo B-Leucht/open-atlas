@@ -113,13 +113,6 @@ def _init_duckdb_spatial(conn: duckdb.DuckDBPyConnection) -> None:
     duckdb.load_extension("spatial")
 
 
-def _init_duckdb_httpfs(conn: duckdb.DuckDBPyConnection) -> None:
-    """
-    Ensure DuckDB HTTPFS extension is installed and loaded for remote files.
-    """
-    conn.execute("SET allow_unsigned_extensions=true;")
-    duckdb.install_extension("httpfs")
-    duckdb.load_extension("httpfs")
 
 
 def query_tabular(url: str, sql_query: str) -> Dict[str, Any]:
@@ -231,7 +224,7 @@ def query_geospatial(url: str, sql_query: str) -> Dict[str, Any]:
         "sql_query": sql_query,
         "preview_markdown": preview.to_markdown(index=False),
         "columns": list(preview.columns),
-        "row_count": len(preview),
+        "row_count": len(result_df),
     }
 
     if coords is not None:

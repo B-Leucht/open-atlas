@@ -288,9 +288,7 @@ def node_generate_answer(state: AgentState) -> AgentState:
                     "Geospatial query preview (markdown table):\n"
                     f"{analysis.get('preview_markdown')}\n"
                 )
-            
-            # Note: Coordinate checking against districts is disabled to prevent crashes
-            # The Stadtbezirke dataset is available for the LLM to reference in its analysis
+
 
     messages: List[BaseMessage] = [
         AIMessage(content=system_prompt),
