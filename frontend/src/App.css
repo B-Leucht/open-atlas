@@ -25,6 +25,7 @@ body {
   display: flex;
   align-items: center;
   gap: 1rem;
+  flex-shrink: 0;
 }
 
 .header h1 {
@@ -45,6 +46,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  flex-shrink: 0;
 }
 
 .dataset-picker {
@@ -339,4 +341,111 @@ body {
   color: #0066cc;
   font-weight: 600;
   text-align: center;
+}
+
+/* Header Actions */
+.header-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+
+/* District Toggle Button */
+.district-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: white;
+  border: 2px solid #1976d2;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #1976d2;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.district-toggle-btn .btn-icon {
+  font-size: 1.1rem;
+}
+
+.district-toggle-btn .btn-text {
+  font-weight: 600;
+}
+
+.district-toggle-btn:hover {
+  background: #e3f2fd;
+}
+
+.district-toggle-btn.active {
+  background: #1976d2;
+  color: white;
+}
+
+.district-toggle-btn.has-data {
+  background: #4caf50;
+  border-color: #4caf50;
+  color: white;
+}
+
+.district-toggle-btn.has-data:hover {
+  background: #43a047;
+}
+
+.district-toggle-btn .badge {
+  background: rgba(255, 255, 255, 0.3);
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+/* District Data Banner */
+.district-data-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+  border-bottom: 1px solid #90caf9;
+  font-size: 0.85rem;
+  color: #1565c0;
+}
+
+.district-data-banner strong {
+  font-weight: 600;
+}
+
+.district-data-banner button {
+  padding: 4px 12px;
+  background: white;
+  border: 1px solid #90caf9;
+  border-radius: 4px;
+  color: #1976d2;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.district-data-banner button:hover {
+  background: #1976d2;
+  color: white;
+  border-color: #1976d2;
+}
+
+/* Empty state hint */
+.empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #888;
+  gap: 8px;
+}
+
+.empty .hint {
+  font-size: 0.85rem;
+  color: #aaa;
 }

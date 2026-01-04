@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import MapView from './components/MapView';
 import Chatbot from './components/Chatbot';
+import DistrictDataSelector from './components/DistrictDataSelector';
 import './App.css';
 
 const API_URL = `http://${window.location.hostname}:5001/api`;
@@ -23,6 +24,19 @@ function App() {
   // View
   const [viewMode, setViewMode] = useState('map');
   const [displayLimit, setDisplayLimit] = useState(20);
+
+  // District visualization
+  const [showDistrictSelector, setShowDistrictSelector] = useState(false);
+  const [districtData, setDistrictData] = useState(null);
+  const [districtDataInfo, setDistrictDataInfo] = useState(null);
+
+  const handleDistrictDataChange = (data, info) => {
+    setDistrictData(data);
+    setDistrictDataInfo(info);
+    if (data) {
+      setViewMode('map'); // Switch to map when district data is loaded
+    }
+  };
 
   useEffect(() => {
     loadStats();
@@ -107,6 +121,16 @@ function App() {
       <header className="header">
         <h1>Munich Open Data</h1>
         {stats && <span className="stat">{stats.total_datasets} datasets available</span>}
+        <div className="header-actions">
+          <button
+            className={`district-toggle-btn ${showDistrictSelector ? 'active' : ''} ${districtData ? 'has-data' : ''}`}
+            onClick={() => setShowDistrictSelector(!showDistrictSelector)}
+          >
+            <span className="btn-icon">{districtData ? '📊' : '🗺️'}</span>
+            <span className="btn-text">District View</span>
+            {districtData && <span className="badge">ON</span>}
+          </button>
+        </div>
       </header>
 
       <div className="controls">
@@ -157,17 +181,44 @@ function App() {
             </div>
           </div>
         )}
+
       </div>
 
       <main className="content">
-        {selectedDatasets.length === 0 ? (
+        {/* District Data Selector Panel */}
+        {showDistrictSelector && (
+          <DistrictDataSelector
+            onDataChange={handleDistrictDataChange}
+            onClose={() => setShowDistrictSelector(false)}
+          />
+        )}
+
+        {/* District data info banner */}
+        {districtData && districtDataInfo && (
+          <div className="district-data-banner">
+            <span>
+              Showing: <strong>{districtDataInfo.dataset?.title}</strong>
+              {districtDataInfo.column && ` (${districtDataInfo.aggregation} of ${districtDataInfo.column})`}
+              {!districtDataInfo.column && ` (${districtDataInfo.aggregation})`}
+            </span>
+            <button onClick={() => handleDistrictDataChange(null, null)}>Clear</button>
+          </div>
+        )}
+
+        {selectedDatasets.length === 0 && !districtData ? (
           <div className="empty">
             <p>Search and add datasets above to get started</p>
+            <p className="hint">Or click "Districts" to visualize data by district</p>
           </div>
         ) : loading ? (
           <div className="loading">Loading...</div>
-        ) : viewMode === 'map' ? (
-          <MapView results={mapResults} datasetMetadata={datasetMetadata} />
+        ) : viewMode === 'map' || districtData ? (
+          <MapView
+            results={mapResults}
+            datasetMetadata={datasetMetadata}
+            showDistricts={true}
+            districtData={districtData}
+          />
         ) : (
           <div className="results">
             <div className="results-count">

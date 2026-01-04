@@ -2,3 +2,18 @@ Flask==3.0.0
 Flask-CORS==4.0.0
 Werkzeug==3.0.1
 requests==2.31.0
+
+# Data layer dependencies
+pyproj>=3.6.0
+geopandas>=0.14.0
+fiona>=1.9.0
+
+# Chat/LLM dependencies
+langchain>=0.1.0
+langchain-openai>=0.0.5
+langgraph>=0.0.20
+chromadb>=0.4.0
+duckdb>=0.9.0
+pandas>=2.0.0
+python-dotenv>=1.0.0
+openai>=1.0.0

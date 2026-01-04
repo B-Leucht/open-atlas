@@ -1,11 +1,14 @@
-import React, { useMemo, useEffect, useCallback } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polygon, LayersControl, FeatureGroup, useMapEvents } from 'react-leaflet';
+import React, { useMemo, useEffect, useCallback, useState } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, Polygon, LayersControl, FeatureGroup, useMapEvents, GeoJSON } from 'react-leaflet';
 import L from 'leaflet';
 import proj4 from 'proj4';
 import 'leaflet/dist/leaflet.css';
 import './MapView.css';
 
-const { Overlay } = LayersControl;
+const { Overlay, BaseLayer } = LayersControl;
+
+// API base URL
+const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5001';
 
 function MapEventHandler({ onMapMove }) {
   useMapEvents({
@@ -65,7 +68,122 @@ const stringToColor = (str) => {
   return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
 };
 
-function MapView({ results, datasetMetadata = {}, onMapMove }) {
+// District colors for choropleth
+const DISTRICT_COLORS = [
+  '#e3f2fd', '#bbdefb', '#90caf9', '#64b5f6', '#42a5f5',
+  '#2196f3', '#1e88e5', '#1976d2', '#1565c0', '#0d47a1'
+];
+
+const getDistrictColor = (value, min, max) => {
+  if (value === undefined || value === null) return '#e0e0e0';
+  const normalized = Math.min(1, Math.max(0, (value - min) / (max - min)));
+  const index = Math.floor(normalized * (DISTRICT_COLORS.length - 1));
+  return DISTRICT_COLORS[index];
+};
+
+function MapView({ results, datasetMetadata = {}, onMapMove, showDistricts = true, districtData = null, onDistrictClick = null }) {
+  // State for district boundaries
+  const [districts, setDistricts] = useState(null);
+  const [districtsLoading, setDistrictsLoading] = useState(false);
+  const [selectedDistrict, setSelectedDistrict] = useState(null);
+  const [hoveredDistrict, setHoveredDistrict] = useState(null);
+
+  // Fetch district boundaries
+  useEffect(() => {
+    if (!showDistricts) return;
+
+    const fetchDistricts = async () => {
+      setDistrictsLoading(true);
+      try {
+        const response = await fetch(`${API_BASE}/api/districts`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.data) {
+            setDistricts(data.data);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch districts:', error);
+      } finally {
+        setDistrictsLoading(false);
+      }
+    };
+
+    fetchDistricts();
+  }, [showDistricts]);
+
+  // Style for district polygons
+  const getDistrictStyle = useCallback((feature) => {
+    const isSelected = selectedDistrict === feature.properties?.district_id;
+    const isHovered = hoveredDistrict === feature.properties?.district_id;
+
+    // Check if we have choropleth data
+    let fillColor = '#3388ff';
+    let fillOpacity = 0.1;
+
+    if (districtData && feature.properties?.district_number) {
+      const value = districtData[feature.properties.district_number];
+      if (value !== undefined) {
+        const values = Object.values(districtData).filter(v => typeof v === 'number');
+        const min = Math.min(...values);
+        const max = Math.max(...values);
+        fillColor = getDistrictColor(value, min, max);
+        fillOpacity = 0.6;
+      }
+    }
+
+    return {
+      color: isSelected ? '#ff4444' : isHovered ? '#ff8800' : '#3388ff',
+      weight: isSelected ? 3 : isHovered ? 2 : 1,
+      fillColor: fillColor,
+      fillOpacity: isHovered ? fillOpacity + 0.2 : fillOpacity,
+      dashArray: isSelected ? null : '3'
+    };
+  }, [selectedDistrict, hoveredDistrict, districtData]);
+
+  // District event handlers
+  const onEachDistrict = useCallback((feature, layer) => {
+    const props = feature.properties || {};
+
+    layer.on({
+      mouseover: (e) => {
+        setHoveredDistrict(props.district_id);
+        e.target.setStyle({
+          weight: 2,
+          fillOpacity: 0.4
+        });
+      },
+      mouseout: (e) => {
+        setHoveredDistrict(null);
+        e.target.setStyle(getDistrictStyle(feature));
+      },
+      click: (e) => {
+        setSelectedDistrict(props.district_id === selectedDistrict ? null : props.district_id);
+        if (onDistrictClick) {
+          onDistrictClick(props);
+        }
+      }
+    });
+
+    // Bind popup
+    const districtValue = districtData && props.district_number ? districtData[props.district_number] : null;
+    const formattedValue = districtValue !== null && districtValue !== undefined
+      ? (typeof districtValue === 'number' ? districtValue.toLocaleString('de-DE') : districtValue)
+      : null;
+
+    const popupContent = `
+      <div class="district-popup">
+        <h4 style="margin: 0 0 8px 0; color: #1976d2;">${props.district_name || 'District'}</h4>
+        <div style="font-size: 0.9em;">
+          <div><strong>Number:</strong> ${props.district_number || 'N/A'}</div>
+          ${props.area_sqm ? `<div><strong>Area:</strong> ${(props.area_sqm / 1000000).toFixed(2)} km²</div>` : ''}
+          ${formattedValue !== null ? `<div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid #eee;"><strong>Data Value:</strong> <span style="color: #1976d2; font-weight: 600;">${formattedValue}</span></div>` : ''}
+        </div>
+      </div>
+    `;
+    layer.bindPopup(popupContent);
+  }, [selectedDistrict, districtData, onDistrictClick, getDistrictStyle]);
+
   // Munich center coordinates
   const munichCenter = [48.1351, 11.5820];
 
@@ -184,6 +302,16 @@ function MapView({ results, datasetMetadata = {}, onMapMove }) {
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
+        {/* District boundaries layer */}
+        {showDistricts && districts && districts.features && (
+          <GeoJSON
+            key={`districts-${selectedDistrict}-${JSON.stringify(districtData || {})}`}
+            data={districts}
+            style={getDistrictStyle}
+            onEachFeature={onEachDistrict}
+          />
+        )}
+
         <LayersControl position="topright" collapsed={false}>
           {/* Render each dataset as a separate layer */}
           {Object.entries(groupedData).map(([category, data], index) => {
@@ -275,10 +403,33 @@ function MapView({ results, datasetMetadata = {}, onMapMove }) {
       </MapContainer>
 
       <div className="map-info">
+        {districts && (
+          <span className="district-info">
+            {districts.features?.length || 0} districts
+            {selectedDistrict && ' (1 selected)'}
+            {' | '}
+          </span>
+        )}
         Displaying {totalPolygons} area{totalPolygons !== 1 ? 's' : ''}
         {totalPolygons > 0 && totalPoints > 0 && ' and '}
         {totalPoints > 0 && `${totalPoints} location${totalPoints !== 1 ? 's' : ''}`} across {Object.keys(groupedData).length} dataset{Object.keys(groupedData).length !== 1 ? 's' : ''}
       </div>
+
+      {/* District legend for choropleth */}
+      {districtData && Object.keys(districtData).length > 0 && (
+        <div className="choropleth-legend">
+          <div className="legend-title">District Values</div>
+          <div className="legend-gradient">
+            {DISTRICT_COLORS.map((color, i) => (
+              <div key={i} className="legend-color" style={{ backgroundColor: color }} />
+            ))}
+          </div>
+          <div className="legend-labels">
+            <span>Low</span>
+            <span>High</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
