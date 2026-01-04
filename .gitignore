@@ -151,3 +151,4 @@ workspaces.db
 # General data/cache directories (already generally ignored but make explicit for this subproject)
 /backend/chatbot-backend/data/
 /backend/chatbot-backend/cache/
+backend/data/.chroma/
