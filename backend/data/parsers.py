@@ -20,6 +20,41 @@ import requests
 logger = logging.getLogger(__name__)
 
 
+def parse_district_number(value: str) -> Optional[str]:
+    """
+    Parse district number from various formats.
+
+    Examples:
+    - "01 Altstadt - Lehel" -> "01" (Indikatorenatlas Raumbezug format)
+    - "Stadt München" -> None (city-wide, not a district)
+    - "01" -> "01"
+    - "1" -> "01"
+    - "Altstadt-Lehel" -> None (name only, can't extract number)
+    """
+    if not value:
+        return None
+
+    val = str(value).strip()
+
+    # Skip city-wide entries
+    if val.lower().startswith('stadt') or val.lower() == 'münchen':
+        return None
+
+    # Try to extract leading number (handles "01 Altstadt - Lehel")
+    parts = val.split(' ', 1)
+    if parts:
+        first = parts[0].strip()
+        # Check if it's a number (possibly with leading zero)
+        if first.isdigit():
+            return first.zfill(2)
+
+    # Check if entire value is a number
+    if val.isdigit():
+        return val.zfill(2)
+
+    return None
+
+
 def parse_german_number(value: str) -> Optional[float]:
     """
     Parse a number that may be in German format.
@@ -190,7 +225,8 @@ class CSVParser(BaseParser):
     LAT_PATTERNS = ['lat', 'latitude', 'breitengrad', 'y', 'northing', 'y_koordinate', 'y-koordinate']
     LON_PATTERNS = ['lon', 'lng', 'longitude', 'laengengrad', 'längengrad', 'x', 'easting',
                     'x_koordinate', 'x-koordinate']
-    DISTRICT_PATTERNS = ['sb_nummer', 'stadtbezirk', 'bezirk', 'bezirksnummer', 'district']
+    DISTRICT_PATTERNS = ['sb_nummer', 'stadtbezirk', 'bezirk', 'bezirksnummer', 'district',
+                         'raumbezug']  # Indikatorenatlas format: "01 Altstadt - Lehel"
 
     def can_parse(self, source: str, content_type: str = None) -> bool:
         if content_type and 'csv' in content_type.lower():
@@ -291,8 +327,13 @@ class CSVParser(BaseParser):
 
                     # Add district info if detected
                     if district_col:
+                        raw_district = row.get(district_col, '')
                         properties['_district_column'] = district_col
-                        properties['_district_value'] = row.get(district_col, '')
+                        properties['_district_value'] = raw_district
+                        # Parse and normalize district number
+                        district_num = parse_district_number(raw_district)
+                        if district_num:
+                            properties['_district_number'] = district_num
 
                     if has_coords:
                         lat_str = row.get(coord_cols['lat'], '').strip()

@@ -249,6 +249,11 @@ class Dataset:
             'updated_at': _to_iso(self.updated_at)
         }
 
+    # Formats that can be parsed into features
+    USABLE_FORMATS = {'csv', 'json', 'geojson', 'wfs', 'gml', 'shapefile', 'shape', 'zip'}
+    # Formats that cannot be parsed (skip these)
+    UNUSABLE_FORMATS = {'pdf', 'html', 'wms', 'xml', 'txt', 'doc', 'docx', 'xls', 'xlsx'}
+
     def get_best_resource(self, format_priority: List[str] = None) -> Optional[DatasetResource]:
         """Get the best resource based on format priority"""
         if format_priority is None:
@@ -258,7 +263,15 @@ class Dataset:
             for resource in self.resources:
                 if resource.format.lower() == fmt.lower():
                     return resource
-        return self.resources[0] if self.resources else None
+        # Only return a resource if it's usable
+        for resource in self.resources:
+            if resource.format.lower() in self.USABLE_FORMATS:
+                return resource
+        return None
+
+    def has_usable_resources(self) -> bool:
+        """Check if dataset has any resources that can be parsed"""
+        return any(r.format.lower() in self.USABLE_FORMATS for r in self.resources)
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'Dataset':

@@ -21,10 +21,18 @@ from .parsers import DataParser, ParseResult
 
 logger = logging.getLogger(__name__)
 
-# District indicator columns
+# District indicator columns (found in CSV headers)
 DISTRICT_COLUMN_PATTERNS = [
     'sb_nummer', 'stadtbezirk', 'bezirk', 'bezirksnummer', 'district',
-    'stadtbezirk_nr', 'bezirks_nr', 'sbz', 'stadtteil'
+    'stadtbezirk_nr', 'bezirks_nr', 'sbz', 'stadtteil',
+    'raumbezug'  # Indikatorenatlas uses this format: "01 Altstadt - Lehel"
+]
+
+# Dataset name/tag patterns that indicate district-level data
+DISTRICT_DATASET_PATTERNS = [
+    'indikatorenatlas',  # All Indikatorenatlas datasets are district-level
+    'stadtbezirk',
+    'bevölkerung',
 ]
 
 
@@ -298,14 +306,16 @@ class DataSync:
             except:
                 pass
 
-        # Check for district-specific columns in tags/title
+        # Check for district-specific patterns in tags/title
         text_to_check = ' '.join([
             dataset.title.lower(),
             dataset.description.lower() if dataset.description else '',
             ' '.join(dataset.tags).lower()
         ])
 
-        for pattern in DISTRICT_COLUMN_PATTERNS:
+        # Check both column patterns and dataset patterns
+        all_patterns = DISTRICT_COLUMN_PATTERNS + DISTRICT_DATASET_PATTERNS
+        for pattern in all_patterns:
             if pattern in text_to_check:
                 dataset.is_district_specific = True
                 break
@@ -316,14 +326,13 @@ class DataSync:
 
     def _sync_dataset_features(self, dataset: Dataset) -> int:
         """Sync features for a dataset"""
-        best_resource = dataset.get_best_resource()
-        if not best_resource:
+        # Skip datasets without usable resources
+        if not dataset.has_usable_resources():
+            logger.debug(f"Skipping {dataset.title} - no usable resources")
             return 0
 
-        # Skip unsupported formats
-        unsupported = {'html', 'pdf', 'wms', 'xml', 'zip'}
-        if best_resource.format.lower() in unsupported:
-            logger.debug(f"Skipping unsupported format {best_resource.format} for {dataset.title}")
+        best_resource = dataset.get_best_resource()
+        if not best_resource:
             return 0
 
         if not best_resource.url or not best_resource.url.startswith('http'):
@@ -352,9 +361,8 @@ class DataSync:
                 )
                 features.append(feature)
 
-            # Assign districts to features with geometry
-            if result.has_geometry:
-                self._assign_districts_to_features(features, dataset.source_id)
+            # Assign districts to features (by geometry or by district number property)
+            self._assign_districts_to_features(features, dataset.source_id)
 
             # Delete old features and insert new
             self.db.delete_features_for_dataset(dataset.id)
@@ -375,12 +383,23 @@ class DataSync:
             return 0
 
     def _assign_districts_to_features(self, features: List[Feature], source_id: str) -> None:
-        """Assign district IDs to features based on location"""
+        """Assign district IDs to features based on location or district number property"""
         districts = self.district_service.get_districts(source_id)
         if not districts:
             return
 
+        # Build lookup by district number for non-geo features
+        district_by_number = {d.number: d for d in districts}
+
         for feature in features:
+            # First, try to assign by _district_number property (for Indikatorenatlas etc.)
+            props = feature.properties or {}
+            district_num = props.get('_district_number')
+            if district_num and district_num in district_by_number:
+                feature.district_id = district_by_number[district_num].id
+                continue
+
+            # Fall back to spatial assignment for features with geometry
             if not feature.centroid_lat or not feature.centroid_lon:
                 continue
 

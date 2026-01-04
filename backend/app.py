@@ -661,6 +661,143 @@ def aggregate_by_district():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 # ============================================================================
+# Composite Index Endpoints
+# ============================================================================
+
+_index_calculator = None
+
+def get_index_calculator():
+    global _index_calculator
+    if _index_calculator is None:
+        from data.indices import IndexCalculator
+        _index_calculator = IndexCalculator(get_db())
+    return _index_calculator
+
+@app.route('/api/indices/presets', methods=['GET'])
+def get_index_presets():
+    """Get available preset indices"""
+    try:
+        calc = get_index_calculator()
+        presets = calc.get_presets()
+        return jsonify({
+            'success': True,
+            'presets': presets
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/indices/presets/<preset_id>', methods=['GET'])
+def get_index_preset_details(preset_id):
+    """Get details about a specific preset"""
+    try:
+        calc = get_index_calculator()
+        details = calc.get_preset_details(preset_id)
+        if not details:
+            return jsonify({'success': False, 'error': 'Preset not found'}), 404
+        return jsonify({
+            'success': True,
+            'preset': details
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/indices/calculate/<preset_id>', methods=['GET'])
+def calculate_preset_index(preset_id):
+    """Calculate a preset index"""
+    try:
+        calc = get_index_calculator()
+        year = request.args.get('year', type=int)
+        result = calc.calculate_preset(preset_id, year)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/indices/calculate', methods=['POST'])
+def calculate_custom_index():
+    """Calculate a custom composite index"""
+    try:
+        from data.indices import IndexComponent, NormalizationType
+
+        calc = get_index_calculator()
+        data = request.json
+
+        if not data or 'components' not in data:
+            return jsonify({'success': False, 'error': 'Missing components'}), 400
+
+        components = []
+        for c in data['components']:
+            norm_type = NormalizationType(c.get('normalize', 'minmax'))
+            # Support both dataset_id (for direct lookup) and dataset_pattern
+            dataset_ref = c.get('dataset_id') or c.get('dataset_pattern', '')
+            components.append(IndexComponent(
+                dataset_pattern=dataset_ref,
+                column=c.get('column'),
+                weight=float(c.get('weight', 1.0)),
+                aggregation=c.get('aggregation', 'count'),
+                normalize=norm_type,
+                label=c.get('label', '')
+            ))
+
+        year = data.get('year')
+        name = data.get('name', 'Custom Index')
+
+        result = calc.calculate_index(components, year, name)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/indices/datasets', methods=['GET'])
+def get_index_datasets():
+    """Get datasets available for building custom indices"""
+    try:
+        calc = get_index_calculator()
+        datasets = calc.get_available_datasets()
+        return jsonify({
+            'success': True,
+            'datasets': datasets
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/indices/datasets/<dataset_id>/columns', methods=['GET'])
+def get_dataset_columns(dataset_id):
+    """Get numeric columns available for aggregation in a dataset"""
+    try:
+        db = get_db()
+        features = db.get_features(dataset_id=dataset_id, limit=10)
+
+        if not features:
+            return jsonify({'success': True, 'columns': []})
+
+        # Collect all property keys and check if they're numeric
+        numeric_columns = set()
+        all_columns = set()
+
+        for f in features:
+            props = f.properties or {}
+            for key, value in props.items():
+                if key.startswith('_'):
+                    continue
+                all_columns.add(key)
+                # Check if value is numeric
+                if isinstance(value, (int, float)):
+                    numeric_columns.add(key)
+                elif isinstance(value, str):
+                    try:
+                        float(value.replace(',', '.'))
+                        numeric_columns.add(key)
+                    except:
+                        pass
+
+        return jsonify({
+            'success': True,
+            'columns': sorted(list(all_columns)),
+            'numeric_columns': sorted(list(numeric_columns))
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# ============================================================================
 # Enhanced Dataset Endpoints (Local DB)
 # ============================================================================
 

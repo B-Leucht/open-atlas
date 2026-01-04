@@ -1,5 +1,5 @@
 import React, { useMemo, useEffect, useCallback, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polygon, LayersControl, FeatureGroup, useMapEvents, GeoJSON } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polygon, Polyline, LayersControl, FeatureGroup, useMapEvents, GeoJSON } from 'react-leaflet';
 import L from 'leaflet';
 import proj4 from 'proj4';
 import 'leaflet/dist/leaflet.css';
@@ -68,10 +68,12 @@ const stringToColor = (str) => {
   return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
 };
 
-// District colors for choropleth
+// District colors for choropleth - red to green gradient
 const DISTRICT_COLORS = [
-  '#e3f2fd', '#bbdefb', '#90caf9', '#64b5f6', '#42a5f5',
-  '#2196f3', '#1e88e5', '#1976d2', '#1565c0', '#0d47a1'
+  '#fee2e2', '#fecaca', '#fca5a5', // Low (red tones)
+  '#fef3c7', '#fde68a', '#fcd34d', // Medium-low (yellow tones)
+  '#d1fae5', '#a7f3d0', '#6ee7b7', // Medium-high (light green)
+  '#34d399'                         // High (green)
 ];
 
 const getDistrictColor = (value, min, max) => {
@@ -122,22 +124,26 @@ function MapView({ results, datasetMetadata = {}, onMapMove, showDistricts = tru
     let fillOpacity = 0.1;
 
     if (districtData && feature.properties?.district_number) {
-      const value = districtData[feature.properties.district_number];
-      if (value !== undefined) {
-        const values = Object.values(districtData).filter(v => typeof v === 'number');
-        const min = Math.min(...values);
-        const max = Math.max(...values);
+      // Handle new data structure: {data: {...}, min, max, label}
+      const dataMap = districtData.data || districtData;
+      const districtValue = dataMap[feature.properties.district_number];
+      const value = typeof districtValue === 'object' ? districtValue?.value : districtValue;
+
+      if (value !== undefined && value !== null) {
+        // Use pre-computed min/max if available, otherwise calculate
+        const min = districtData.min ?? Math.min(...Object.values(dataMap).map(v => typeof v === 'object' ? v.value : v).filter(v => v !== undefined));
+        const max = districtData.max ?? Math.max(...Object.values(dataMap).map(v => typeof v === 'object' ? v.value : v).filter(v => v !== undefined));
         fillColor = getDistrictColor(value, min, max);
-        fillOpacity = 0.6;
+        fillOpacity = 0.7;
       }
     }
 
     return {
-      color: isSelected ? '#ff4444' : isHovered ? '#ff8800' : '#3388ff',
+      color: isSelected ? '#ff4444' : isHovered ? '#1a1a2e' : '#1a1a2e',
       weight: isSelected ? 3 : isHovered ? 2 : 1,
       fillColor: fillColor,
-      fillOpacity: isHovered ? fillOpacity + 0.2 : fillOpacity,
-      dashArray: isSelected ? null : '3'
+      fillOpacity: isHovered ? Math.min(fillOpacity + 0.15, 0.9) : fillOpacity,
+      dashArray: isSelected ? null : null
     };
   }, [selectedDistrict, hoveredDistrict, districtData]);
 
@@ -166,18 +172,32 @@ function MapView({ results, datasetMetadata = {}, onMapMove, showDistricts = tru
     });
 
     // Bind popup
-    const districtValue = districtData && props.district_number ? districtData[props.district_number] : null;
-    const formattedValue = districtValue !== null && districtValue !== undefined
-      ? (typeof districtValue === 'number' ? districtValue.toLocaleString('de-DE') : districtValue)
+    let scoreValue = null;
+    let scoreLabel = 'Score';
+
+    if (districtData && props.district_number) {
+      const dataMap = districtData.data || districtData;
+      const districtValue = dataMap[props.district_number];
+      scoreValue = typeof districtValue === 'object' ? districtValue?.value : districtValue;
+      scoreLabel = districtData.label || 'Score';
+    }
+
+    const formattedScore = scoreValue !== null && scoreValue !== undefined
+      ? scoreValue.toFixed(1)
       : null;
 
     const popupContent = `
       <div class="district-popup">
-        <h4 style="margin: 0 0 8px 0; color: #1976d2;">${props.district_name || 'District'}</h4>
-        <div style="font-size: 0.9em;">
-          <div><strong>Number:</strong> ${props.district_number || 'N/A'}</div>
-          ${props.area_sqm ? `<div><strong>Area:</strong> ${(props.area_sqm / 1000000).toFixed(2)} km²</div>` : ''}
-          ${formattedValue !== null ? `<div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid #eee;"><strong>Data Value:</strong> <span style="color: #1976d2; font-weight: 600;">${formattedValue}</span></div>` : ''}
+        <h4 style="margin: 0 0 8px 0; color: #1a1a2e; font-size: 1rem;">${props.district_name || 'District'}</h4>
+        <div style="font-size: 0.875rem; color: #444;">
+          ${formattedScore !== null ? `
+            <div style="background: #f8f9fa; padding: 8px 12px; border-radius: 6px; margin-bottom: 8px;">
+              <div style="font-size: 0.75rem; color: #666; margin-bottom: 2px;">${scoreLabel}</div>
+              <div style="font-size: 1.5rem; font-weight: 700; color: #0066cc;">${formattedScore}</div>
+            </div>
+          ` : ''}
+          <div style="color: #888; font-size: 0.8rem;">District ${props.district_number || 'N/A'}</div>
+          ${props.area_sqm ? `<div style="color: #888; font-size: 0.8rem;">${(props.area_sqm / 1000000).toFixed(2)} km²</div>` : ''}
         </div>
       </div>
     `;
@@ -196,13 +216,34 @@ function MapView({ results, datasetMetadata = {}, onMapMove, showDistricts = tru
 
       const category = f.category || 'unknown';
       if (!groups[category]) {
-        groups[category] = { points: [], polygons: [] };
+        groups[category] = { points: [], polygons: [], lines: [] };
       }
 
       if (f.geometry.type === 'Point') {
         const position = convertCoordinates(f.geometry.coordinates);
         if (position) {
           groups[category].points.push({ ...f, position });
+        }
+      } else if (f.geometry.type === 'LineString') {
+        try {
+          const positions = f.geometry.coordinates.map(coord => convertCoordinates(coord)).filter(Boolean);
+          if (positions.length > 1) {
+            groups[category].lines.push({ ...f, positions });
+          }
+        } catch (error) {
+          console.error('LineString conversion error:', error);
+        }
+      } else if (f.geometry.type === 'MultiLineString') {
+        try {
+          // Handle each line in the MultiLineString
+          f.geometry.coordinates.forEach((line, idx) => {
+            const positions = line.map(coord => convertCoordinates(coord)).filter(Boolean);
+            if (positions.length > 1) {
+              groups[category].lines.push({ ...f, positions, lineIndex: idx });
+            }
+          });
+        } catch (error) {
+          console.error('MultiLineString conversion error:', error);
         }
       } else if (f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon') {
         try {
@@ -245,6 +286,7 @@ function MapView({ results, datasetMetadata = {}, onMapMove, showDistricts = tru
   // Check if we have any data to display
   const hasData = Object.keys(groupedData).length > 0;
   const totalPoints = Object.values(groupedData).reduce((sum, g) => sum + g.points.length, 0);
+  const totalLines = Object.values(groupedData).reduce((sum, g) => sum + g.lines.length, 0);
   const totalPolygons = Object.values(groupedData).reduce((sum, g) => sum + g.polygons.length, 0);
 
   // Apply colors to layer control labels
@@ -273,7 +315,8 @@ function MapView({ results, datasetMetadata = {}, onMapMove, showDistricts = tru
     return () => clearTimeout(timer);
   }, [groupedData, getCategoryColor]);
 
-  if (!hasData) {
+  // Show map if we have data OR if we're showing districts
+  if (!hasData && !showDistricts) {
     return (
       <div className="no-map-results">
         <h3>No location data to display</h3>
@@ -318,11 +361,45 @@ function MapView({ results, datasetMetadata = {}, onMapMove, showDistricts = tru
             const color = getCategoryColor(category);
             const metadata = datasetMetadata[category];
             const datasetName = metadata?.title || category.substring(0, 12) + '...';
-            const layerName = `${datasetName} (${data.points.length + data.polygons.length})`;
+            const featureCount = data.points.length + data.lines.length + data.polygons.length;
+            const layerName = `${datasetName} (${featureCount})`;
 
             return (
               <Overlay key={category} checked name={layerName}>
                 <FeatureGroup>
+                  {/* Render lines for this dataset */}
+                  {data.lines.map((feature, index) => (
+                    <Polyline
+                      key={`line-${category}-${index}`}
+                      positions={feature.positions}
+                      pathOptions={{
+                        color: color,
+                        weight: 3,
+                        opacity: 0.8
+                      }}
+                    >
+                      <Popup maxWidth={320}>
+                        <div className="popup-content">
+                          <div className="popup-category" style={{ color: color, fontWeight: 'bold', marginBottom: '8px' }}>
+                            {metadata?.title || category}
+                          </div>
+                          {feature.properties && (
+                            <div className="popup-properties">
+                              {Object.entries(feature.properties)
+                                .filter(([key, value]) => value && !key.startsWith('_') && !key.includes('coord') && !key.includes('shape') && !key.includes('objectid') && !key.includes('dataset_id') && !key.includes('feature_id') && !key.includes('district_id'))
+                                .slice(0, 8)
+                                .map(([key, value]) => (
+                                  <div key={key} style={{ marginBottom: '4px' }}>
+                                    <strong style={{ textTransform: 'capitalize' }}>{key.replace(/_/g, ' ')}:</strong> {String(value)}
+                                  </div>
+                                ))}
+                            </div>
+                          )}
+                        </div>
+                      </Popup>
+                    </Polyline>
+                  ))}
+
                   {/* Render polygons for this dataset */}
                   {data.polygons.map((feature, index) => (
                     <Polygon
@@ -338,16 +415,16 @@ function MapView({ results, datasetMetadata = {}, onMapMove, showDistricts = tru
                       <Popup maxWidth={320}>
                         <div className="popup-content">
                           <div className="popup-category" style={{ color: color, fontWeight: 'bold', marginBottom: '8px' }}>
-                            Dataset: {category.substring(0, 12)}...
+                            {metadata?.title || category}
                           </div>
                           {feature.properties && (
                             <div className="popup-properties">
                               {Object.entries(feature.properties)
-                                .filter(([key, value]) => value && !key.includes('coord') && !key.includes('shape') && !key.includes('objectid'))
+                                .filter(([key, value]) => value && !key.startsWith('_') && !key.includes('coord') && !key.includes('shape') && !key.includes('objectid') && !key.includes('dataset_id') && !key.includes('feature_id') && !key.includes('district_id'))
                                 .slice(0, 8)
                                 .map(([key, value]) => (
                                   <div key={key} style={{ marginBottom: '4px' }}>
-                                    <strong style={{ textTransform: 'capitalize' }}>{key.replace('_', ' ')}:</strong> {String(value)}
+                                    <strong style={{ textTransform: 'capitalize' }}>{key.replace(/_/g, ' ')}:</strong> {String(value)}
                                   </div>
                                 ))}
                             </div>
@@ -367,16 +444,16 @@ function MapView({ results, datasetMetadata = {}, onMapMove, showDistricts = tru
                       <Popup maxWidth={320}>
                         <div className="popup-content">
                           <div className="popup-category" style={{ color: color, fontWeight: 'bold', marginBottom: '8px' }}>
-                            Dataset: {category.substring(0, 12)}...
+                            {metadata?.title || category}
                           </div>
                           {feature.properties && (
                             <div className="popup-properties">
                               {Object.entries(feature.properties)
-                                .filter(([key, value]) => value && !key.includes('coord') && !key.includes('shape') && typeof value === 'string' && value.length < 200)
+                                .filter(([key, value]) => value && !key.startsWith('_') && !key.includes('coord') && !key.includes('shape') && !key.includes('dataset_id') && !key.includes('feature_id') && !key.includes('district_id') && typeof value === 'string' && value.length < 200)
                                 .slice(0, 6)
                                 .map(([key, value]) => (
                                   <div key={key} style={{ marginBottom: '4px' }}>
-                                    <strong style={{ textTransform: 'capitalize' }}>{key.replace('_', ' ')}:</strong> {value}
+                                    <strong style={{ textTransform: 'capitalize' }}>{key.replace(/_/g, ' ')}:</strong> {value}
                                   </div>
                                 ))}
                             </div>
@@ -384,11 +461,11 @@ function MapView({ results, datasetMetadata = {}, onMapMove, showDistricts = tru
                           <div className="popup-nav-buttons" style={{ marginTop: '12px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                             <a href={`https://maps.apple.com/?q=${feature.position[0]},${feature.position[1]}`} target="_blank" rel="noopener noreferrer"
                               style={{ padding: '6px 10px', background: '#000', color: 'white', textDecoration: 'none', borderRadius: '6px', fontSize: '0.85rem', fontWeight: '500' }}>
-                              🍎 Apple Maps
+                              Apple Maps
                             </a>
                             <a href={`https://www.google.com/maps/search/?api=1&query=${feature.position[0]},${feature.position[1]}`} target="_blank" rel="noopener noreferrer"
                               style={{ padding: '6px 10px', background: '#4285f4', color: 'white', textDecoration: 'none', borderRadius: '6px', fontSize: '0.85rem', fontWeight: '500' }}>
-                              🗺️ Google Maps
+                              Google Maps
                             </a>
                           </div>
                         </div>
@@ -407,12 +484,20 @@ function MapView({ results, datasetMetadata = {}, onMapMove, showDistricts = tru
           <span className="district-info">
             {districts.features?.length || 0} districts
             {selectedDistrict && ' (1 selected)'}
-            {' | '}
+            {(totalPoints > 0 || totalLines > 0 || totalPolygons > 0) && ' | '}
           </span>
         )}
-        Displaying {totalPolygons} area{totalPolygons !== 1 ? 's' : ''}
-        {totalPolygons > 0 && totalPoints > 0 && ' and '}
-        {totalPoints > 0 && `${totalPoints} location${totalPoints !== 1 ? 's' : ''}`} across {Object.keys(groupedData).length} dataset{Object.keys(groupedData).length !== 1 ? 's' : ''}
+        {(totalPoints > 0 || totalLines > 0 || totalPolygons > 0) && (
+          <>
+            {totalPoints > 0 && `${totalPoints} point${totalPoints !== 1 ? 's' : ''}`}
+            {totalPoints > 0 && (totalLines > 0 || totalPolygons > 0) && ', '}
+            {totalLines > 0 && `${totalLines} line${totalLines !== 1 ? 's' : ''}`}
+            {totalLines > 0 && totalPolygons > 0 && ', '}
+            {totalPolygons > 0 && `${totalPolygons} area${totalPolygons !== 1 ? 's' : ''}`}
+            {' from '}
+            {Object.keys(groupedData).length} dataset{Object.keys(groupedData).length !== 1 ? 's' : ''}
+          </>
+        )}
       </div>
 
       {/* District legend for choropleth */}

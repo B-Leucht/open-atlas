@@ -65,7 +65,18 @@ class DistrictService:
                 logger.info(f"Source CRS: {source_crs}")
 
             districts = []
-            seen_numbers = set()
+            district_by_number = {}  # Track best geometry per district
+
+            def count_points(geom):
+                """Count total points in a geometry"""
+                if not geom:
+                    return 0
+                coords = geom.get('coordinates', [])
+                if geom.get('type') == 'Polygon':
+                    return len(coords[0]) if coords else 0
+                elif geom.get('type') == 'MultiPolygon':
+                    return sum(len(ring[0]) if ring else 0 for ring in coords)
+                return 0
 
             for feature in features:
                 props = feature.get('properties', {})
@@ -79,13 +90,23 @@ class DistrictService:
                     logger.warning(f"Skipping feature with missing number/name: {props}")
                     continue
 
-                # Skip duplicates (some districts have multiple polygons)
-                # We'll merge them later or keep the first one
-                if number in seen_numbers:
-                    # For now, skip duplicates - could merge geometries in future
-                    logger.debug(f"Skipping duplicate district {number}: {name}")
-                    continue
-                seen_numbers.add(number)
+                # Handle duplicates: keep the geometry with more points
+                current_points = count_points(geometry)
+                if number in district_by_number:
+                    existing = district_by_number[number]
+                    existing_points = count_points(existing['geometry'])
+                    if current_points <= existing_points:
+                        logger.debug(f"Skipping smaller duplicate for {number}: {current_points} vs {existing_points} points")
+                        continue
+                    logger.debug(f"Replacing {number} with larger geometry: {current_points} vs {existing_points} points")
+
+                district_by_number[number] = {'props': props, 'geometry': geometry, 'name': name}
+
+            # Build district objects from the best geometries
+            for number, data in district_by_number.items():
+                props = data['props']
+                geometry = data['geometry']
+                name = data['name']
 
                 # Transform geometry coordinates
                 if geometry:

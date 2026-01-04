@@ -1,0 +1,776 @@
+"""
+Composite Index Calculator for Open Atlas
+Enables creating district-level indices by combining multiple datasets with weights.
+"""
+
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Tuple
+from enum import Enum
+import logging
+
+from .database import Database
+
+logger = logging.getLogger(__name__)
+
+
+class NormalizationType(Enum):
+    """How to normalize values before combining"""
+    NONE = "none"           # Raw values
+    POPULATION = "population"  # Per capita (per 1000 residents)
+    AREA = "area"           # Per km²
+    MINMAX = "minmax"       # Scale 0-100
+    ZSCORE = "zscore"       # Standard deviations from mean
+
+
+@dataclass
+class IndexComponent:
+    """A single component of a composite index"""
+    dataset_pattern: str    # Title pattern to match (will resolve to dataset_id)
+    column: Optional[str]   # Column to aggregate (None = count)
+    weight: float           # Weight in final index (-1 to 1, negative = inverse)
+    aggregation: str = "sum"  # count, sum, avg, min, max
+    normalize: NormalizationType = NormalizationType.MINMAX
+    label: str = ""         # Human-readable label
+
+
+@dataclass
+class IndexPreset:
+    """A predefined composite index"""
+    id: str
+    name: str
+    description: str
+    icon: str
+    components: List[IndexComponent]
+    higher_is_better: bool = True
+
+
+# =============================================================================
+# PRESET INDICES
+# =============================================================================
+
+BIKE_FRIENDLY_INDEX = IndexPreset(
+    id="bike-friendly",
+    name="Bike-Friendly",
+    description="How bike-friendly is each district based on infrastructure, parking, and traffic calming",
+    icon="🚴",
+    higher_is_better=True,
+    components=[
+        IndexComponent(
+            dataset_pattern="Radverkehrsanlagen im Straßenunterhalt",
+            column=None,
+            weight=0.25,
+            aggregation="count",
+            normalize=NormalizationType.AREA,
+            label="Bike paths"
+        ),
+        IndexComponent(
+            dataset_pattern="Fahrradparken mit Standardmaßen",
+            column=None,
+            weight=0.20,
+            aggregation="count",
+            normalize=NormalizationType.POPULATION,
+            label="Bike parking"
+        ),
+        IndexComponent(
+            dataset_pattern="Tempo-30-Zone",
+            column=None,
+            weight=0.15,
+            aggregation="count",
+            normalize=NormalizationType.AREA,
+            label="Tempo-30 zones"
+        ),
+        IndexComponent(
+            dataset_pattern="Fahrradstraßen",
+            column=None,
+            weight=0.15,
+            aggregation="count",
+            normalize=NormalizationType.AREA,
+            label="Bike streets"
+        ),
+        IndexComponent(
+            dataset_pattern="Radentscheidmaßnahmen",
+            column=None,
+            weight=0.10,
+            aggregation="count",
+            normalize=NormalizationType.AREA,
+            label="Planned improvements"
+        ),
+        IndexComponent(
+            dataset_pattern="Motorisierungsgrad Personenkraftwagen",
+            column="Indikatorwert",
+            weight=-0.15,
+            aggregation="avg",
+            normalize=NormalizationType.MINMAX,
+            label="Car ownership (inverse)"
+        ),
+    ]
+)
+
+CHILD_FRIENDLY_INDEX = IndexPreset(
+    id="child-friendly",
+    name="Child-Friendly",
+    description="How child-friendly is each district based on playgrounds, childcare, safety, and green spaces",
+    icon="👶",
+    higher_is_better=True,
+    components=[
+        IndexComponent(
+            dataset_pattern="Öffentliche Spielplätze",
+            column=None,
+            weight=0.25,
+            aggregation="count",
+            normalize=NormalizationType.POPULATION,
+            label="Playgrounds"
+        ),
+        IndexComponent(
+            dataset_pattern="Kindertagesbetreuungseinrichtungen",
+            column=None,
+            weight=0.25,
+            aggregation="count",
+            normalize=NormalizationType.POPULATION,
+            label="Childcare facilities"
+        ),
+        IndexComponent(
+            dataset_pattern="Tempo-30-Zone",
+            column=None,
+            weight=0.15,
+            aggregation="count",
+            normalize=NormalizationType.AREA,
+            label="Traffic calming"
+        ),
+        IndexComponent(
+            dataset_pattern="Gefahrenstellen",
+            column=None,
+            weight=-0.15,
+            aggregation="count",
+            normalize=NormalizationType.AREA,
+            label="Danger spots (inverse)"
+        ),
+        IndexComponent(
+            dataset_pattern="Kinderbetreuung - Betreuungsangebot",
+            column="Indikatorwert",
+            weight=0.20,
+            aggregation="avg",
+            normalize=NormalizationType.MINMAX,
+            label="Childcare availability"
+        ),
+    ]
+)
+
+SENIOR_FRIENDLY_INDEX = IndexPreset(
+    id="senior-friendly",
+    name="Senior-Friendly",
+    description="How senior-friendly is each district based on healthcare, services, and accessibility",
+    icon="👵",
+    higher_is_better=True,
+    components=[
+        IndexComponent(
+            dataset_pattern="Alten- und Servicezentrum",
+            column=None,
+            weight=0.25,
+            aggregation="count",
+            normalize=NormalizationType.POPULATION,
+            label="Senior centers"
+        ),
+        IndexComponent(
+            dataset_pattern="Arzt*Ärztin-Dichte",
+            column="Indikatorwert",
+            weight=0.25,
+            aggregation="avg",
+            normalize=NormalizationType.MINMAX,
+            label="Doctor density"
+        ),
+        IndexComponent(
+            dataset_pattern="Apotheken-Dichte",
+            column="Indikatorwert",
+            weight=0.15,
+            aggregation="avg",
+            normalize=NormalizationType.MINMAX,
+            label="Pharmacy density"
+        ),
+        IndexComponent(
+            dataset_pattern="Behindertenparkplätze",
+            column=None,
+            weight=0.15,
+            aggregation="count",
+            normalize=NormalizationType.AREA,
+            label="Accessible parking"
+        ),
+        IndexComponent(
+            dataset_pattern="Vollstationäre Pflegeeinrichtungen",
+            column=None,
+            weight=0.20,
+            aggregation="count",
+            normalize=NormalizationType.POPULATION,
+            label="Care facilities"
+        ),
+    ]
+)
+
+GREEN_SPACES_INDEX = IndexPreset(
+    id="green-spaces",
+    name="Green & Recreation",
+    description="Access to parks, swimming, and outdoor recreation",
+    icon="🌳",
+    higher_is_better=True,
+    components=[
+        IndexComponent(
+            dataset_pattern="Öffentliche Spielplätze",
+            column=None,
+            weight=0.25,
+            aggregation="count",
+            normalize=NormalizationType.POPULATION,
+            label="Playgrounds"
+        ),
+        IndexComponent(
+            dataset_pattern="Baden in der Isar",
+            column=None,
+            weight=0.25,
+            aggregation="count",
+            normalize=NormalizationType.AREA,
+            label="Swimming spots"
+        ),
+        IndexComponent(
+            dataset_pattern="Schwimmbäder in München",
+            column=None,
+            weight=0.25,
+            aggregation="count",
+            normalize=NormalizationType.POPULATION,
+            label="Swimming pools"
+        ),
+        IndexComponent(
+            dataset_pattern="Trinkbrunnen",
+            column=None,
+            weight=0.25,
+            aggregation="count",
+            normalize=NormalizationType.AREA,
+            label="Drinking fountains"
+        ),
+    ]
+)
+
+SERVICES_INDEX = IndexPreset(
+    id="services",
+    name="Public Services",
+    description="Access to public services and amenities",
+    icon="🏛️",
+    higher_is_better=True,
+    components=[
+        IndexComponent(
+            dataset_pattern="WLAN-Standorte",
+            column=None,
+            weight=0.15,
+            aggregation="count",
+            normalize=NormalizationType.POPULATION,
+            label="Public WiFi"
+        ),
+        IndexComponent(
+            dataset_pattern="WC-Standorte",
+            column=None,
+            weight=0.15,
+            aggregation="count",
+            normalize=NormalizationType.AREA,
+            label="Public toilets"
+        ),
+        IndexComponent(
+            dataset_pattern="Wertstoffinseln",
+            column=None,
+            weight=0.20,
+            aggregation="count",
+            normalize=NormalizationType.POPULATION,
+            label="Recycling points"
+        ),
+        IndexComponent(
+            dataset_pattern="Nachbarschaftstreffs",
+            column=None,
+            weight=0.25,
+            aggregation="count",
+            normalize=NormalizationType.POPULATION,
+            label="Community centers"
+        ),
+        IndexComponent(
+            dataset_pattern="Sozialbürgerhaus",
+            column=None,
+            weight=0.25,
+            aggregation="count",
+            normalize=NormalizationType.POPULATION,
+            label="Social services"
+        ),
+    ]
+)
+
+# All available presets
+INDEX_PRESETS = {
+    "bike-friendly": BIKE_FRIENDLY_INDEX,
+    "child-friendly": CHILD_FRIENDLY_INDEX,
+    "senior-friendly": SENIOR_FRIENDLY_INDEX,
+    "green-spaces": GREEN_SPACES_INDEX,
+    "services": SERVICES_INDEX,
+}
+
+
+# =============================================================================
+# INDEX CALCULATOR
+# =============================================================================
+
+class IndexCalculator:
+    """Calculate composite indices from multiple datasets"""
+
+    def __init__(self, db: Database = None):
+        self.db = db or Database()
+        self._population_cache: Dict[str, float] = {}
+        self._area_cache: Dict[str, float] = {}
+        self._dataset_id_cache: Dict[str, str] = {}
+
+    def _resolve_dataset_id(self, pattern: str) -> Optional[str]:
+        """Resolve a title pattern or dataset ID to an actual dataset ID"""
+        if pattern in self._dataset_id_cache:
+            return self._dataset_id_cache[pattern]
+
+        with self.db.get_connection() as conn:
+            # First try exact ID match (for custom index with dataset IDs)
+            cursor = conn.execute(
+                "SELECT id FROM datasets WHERE id = ? AND feature_count > 0 LIMIT 1",
+                (pattern,)
+            )
+            row = cursor.fetchone()
+            if row:
+                self._dataset_id_cache[pattern] = row[0]
+                return row[0]
+
+            # Then try title pattern match (for presets)
+            cursor = conn.execute(
+                "SELECT id FROM datasets WHERE title LIKE ? AND feature_count > 0 LIMIT 1",
+                (f"%{pattern}%",)
+            )
+            row = cursor.fetchone()
+            if row:
+                self._dataset_id_cache[pattern] = row[0]
+                return row[0]
+        return None
+
+    def get_presets(self) -> List[Dict[str, Any]]:
+        """Get list of available preset indices"""
+        return [
+            {
+                "id": p.id,
+                "name": p.name,
+                "description": p.description,
+                "icon": p.icon,
+                "component_count": len(p.components),
+                "higher_is_better": p.higher_is_better,
+            }
+            for p in INDEX_PRESETS.values()
+        ]
+
+    def get_preset_details(self, preset_id: str) -> Optional[Dict[str, Any]]:
+        """Get detailed info about a preset including its components"""
+        preset = INDEX_PRESETS.get(preset_id)
+        if not preset:
+            return None
+
+        return {
+            "id": preset.id,
+            "name": preset.name,
+            "description": preset.description,
+            "icon": preset.icon,
+            "higher_is_better": preset.higher_is_better,
+            "components": [
+                {
+                    "dataset_pattern": c.dataset_pattern,
+                    "label": c.label,
+                    "weight": c.weight,
+                    "aggregation": c.aggregation,
+                    "normalize": c.normalize.value,
+                }
+                for c in preset.components
+            ]
+        }
+
+    def calculate_preset(self, preset_id: str, year: Optional[int] = None) -> Dict[str, Any]:
+        """Calculate a preset index"""
+        preset = INDEX_PRESETS.get(preset_id)
+        if not preset:
+            return {"success": False, "error": f"Unknown preset: {preset_id}"}
+
+        return self.calculate_index(preset.components, year, preset.name)
+
+    def calculate_index(
+        self,
+        components: List[IndexComponent],
+        year: Optional[int] = None,
+        name: str = "Custom Index"
+    ) -> Dict[str, Any]:
+        """
+        Calculate a composite index from multiple components.
+
+        Returns district scores from 0-100 with per-district component breakdown.
+        """
+        # Get districts
+        districts = self._get_districts()
+        if not districts:
+            return {"success": False, "error": "No districts found"}
+
+        # Load population and area for normalization
+        self._load_normalization_data()
+
+        # Calculate raw values for each component
+        component_values: List[Dict[str, float]] = []
+        raw_component_values: List[Dict[str, float]] = []  # Pre-normalization values
+        component_info: List[Dict[str, Any]] = []
+
+        for comp in components:
+            values = self._calculate_component(comp, districts, year)
+            if values:
+                component_values.append(values)
+                # Store raw values before any district-level normalization was applied
+                # Note: _calculate_component already applies normalization, so we need raw counts
+                raw_values = self._calculate_raw_component(comp, districts, year)
+                raw_component_values.append(raw_values)
+                # Get the resolved dataset ID for this component
+                dataset_id = self._resolve_dataset_id(comp.dataset_pattern)
+                component_info.append({
+                    "label": comp.label or comp.dataset_pattern,
+                    "weight": comp.weight,
+                    "aggregation": comp.aggregation,
+                    "normalize": comp.normalize.value if isinstance(comp.normalize, NormalizationType) else comp.normalize,
+                    "districts_with_data": len([v for v in values.values() if v > 0]),
+                    "dataset_id": dataset_id  # Include dataset ID for fetching features
+                })
+
+        if not component_values:
+            return {"success": False, "error": "No data available for any component"}
+
+        # Combine components into final scores with breakdown
+        final_scores, breakdown = self._combine_components_with_breakdown(components, component_values, raw_component_values, districts)
+
+        # Build response
+        return {
+            "success": True,
+            "name": name,
+            "scores": final_scores,
+            "breakdown": breakdown,  # Per-district component values
+            "components": component_info,
+            "districts": [
+                {"number": d["number"], "name": d["name"]}
+                for d in districts
+            ],
+            "stats": {
+                "min": min(final_scores.values()) if final_scores else 0,
+                "max": max(final_scores.values()) if final_scores else 0,
+                "avg": sum(final_scores.values()) / len(final_scores) if final_scores else 0,
+            }
+        }
+
+    def _get_districts(self) -> List[Dict[str, Any]]:
+        """Get all districts"""
+        with self.db.get_connection() as conn:
+            cursor = conn.execute(
+                "SELECT number, name, area_sqm FROM districts ORDER BY CAST(number AS INTEGER)"
+            )
+            return [
+                {"number": row[0], "name": row[1], "area_sqm": row[2]}
+                for row in cursor.fetchall()
+            ]
+
+    def _load_normalization_data(self):
+        """Load population data from Indikatorenatlas"""
+        if self._population_cache:
+            return
+
+        with self.db.get_connection() as conn:
+            # Get population from Bevölkerungsanteil dataset (has absolute numbers in Basiswert.1)
+            cursor = conn.execute("""
+                SELECT
+                    json_extract(f.properties, '$._district_number') as district_num,
+                    json_extract(f.properties, '$."Basiswert.1"') as population
+                FROM features f
+                JOIN datasets d ON f.dataset_id = d.id
+                WHERE d.title LIKE '%Bevölkerung - Bevölkerungsanteil%'
+                AND json_extract(f.properties, '$.Jahr') = '2024'
+                AND json_extract(f.properties, '$.Ausprägung') = 'insgesamt'
+            """)
+
+            for row in cursor.fetchall():
+                if row[0] and row[1]:
+                    try:
+                        self._population_cache[row[0]] = float(row[1])
+                    except (ValueError, TypeError):
+                        pass
+
+            # Get area from districts table
+            cursor = conn.execute("SELECT number, area_sqm FROM districts")
+            for row in cursor.fetchall():
+                if row[1]:
+                    self._area_cache[row[0]] = row[1] / 1_000_000  # Convert to km²
+
+    def _calculate_raw_component(
+        self,
+        comp: IndexComponent,
+        districts: List[Dict[str, Any]],
+        year: Optional[int] = None
+    ) -> Dict[str, Dict[str, float]]:
+        """Get raw values for a component - returns {district: {count: X, normalized: Y}}"""
+        dataset_id = self._resolve_dataset_id(comp.dataset_pattern)
+        if not dataset_id:
+            return {}
+
+        with self.db.get_connection() as conn:
+            if comp.column is None or comp.aggregation == "count":
+                cursor = conn.execute("""
+                    SELECT d.number, COUNT(f.id) as value
+                    FROM districts d
+                    LEFT JOIN features f ON f.district_id = d.id AND f.dataset_id = ?
+                    GROUP BY d.number
+                """, (dataset_id,))
+            else:
+                year_filter = f"AND json_extract(f.properties, '$.Jahr') = '{year}'" if year else ""
+                agg_func = {"sum": "SUM", "avg": "AVG", "min": "MIN", "max": "MAX"}.get(comp.aggregation, "AVG")
+                cursor = conn.execute(f"""
+                    SELECT json_extract(f.properties, '$._district_number') as district_num,
+                           {agg_func}(CAST(json_extract(f.properties, '$."{comp.column}"') AS REAL)) as value
+                    FROM features f
+                    WHERE f.dataset_id = ? {year_filter}
+                    AND json_extract(f.properties, '$._district_number') IS NOT NULL
+                    GROUP BY district_num
+                """, (dataset_id,))
+
+            raw_counts = {row[0]: float(row[1]) for row in cursor.fetchall() if row[0] and row[1] is not None}
+
+        # Build result with both count and normalized value
+        result = {}
+        norm_type = comp.normalize if isinstance(comp.normalize, NormalizationType) else NormalizationType(comp.normalize)
+
+        for district_num, count in raw_counts.items():
+            normalized = count
+            if norm_type == NormalizationType.POPULATION:
+                pop = self._population_cache.get(district_num, 0)
+                if pop > 0:
+                    normalized = (count / pop) * 1000
+            elif norm_type == NormalizationType.AREA:
+                area = self._area_cache.get(district_num, 0)
+                if area > 0:
+                    normalized = count / area
+
+            # Include the denominator (population or area) for display
+            denominator = None
+            if norm_type == NormalizationType.POPULATION:
+                denominator = self._population_cache.get(district_num, 0)
+            elif norm_type == NormalizationType.AREA:
+                denominator = self._area_cache.get(district_num, 0)
+
+            result[district_num] = {"count": count, "normalized": normalized, "denominator": denominator}
+
+        return result
+
+    def _calculate_component(
+        self,
+        comp: IndexComponent,
+        districts: List[Dict[str, Any]],
+        year: Optional[int] = None
+    ) -> Dict[str, float]:
+        """Calculate values for a single component across all districts"""
+        # Resolve dataset pattern to ID
+        dataset_id = self._resolve_dataset_id(comp.dataset_pattern)
+        if not dataset_id:
+            logger.warning(f"Could not find dataset matching: {comp.dataset_pattern}")
+            return {}
+
+        with self.db.get_connection() as conn:
+            # Build query based on whether it's a count or value aggregation
+            if comp.column is None or comp.aggregation == "count":
+                # Count features per district
+                cursor = conn.execute("""
+                    SELECT
+                        d.number,
+                        COUNT(f.id) as value
+                    FROM districts d
+                    LEFT JOIN features f ON f.district_id = d.id AND f.dataset_id = ?
+                    GROUP BY d.number
+                """, (dataset_id,))
+            else:
+                # Aggregate a specific column (for Indikatorenatlas data)
+                year_filter = f"AND json_extract(f.properties, '$.Jahr') = '{year}'" if year else ""
+
+                agg_func = {
+                    "sum": "SUM",
+                    "avg": "AVG",
+                    "min": "MIN",
+                    "max": "MAX"
+                }.get(comp.aggregation, "AVG")
+
+                cursor = conn.execute(f"""
+                    SELECT
+                        json_extract(f.properties, '$._district_number') as district_num,
+                        {agg_func}(CAST(json_extract(f.properties, '$."{comp.column}"') AS REAL)) as value
+                    FROM features f
+                    WHERE f.dataset_id = ?
+                    {year_filter}
+                    AND json_extract(f.properties, '$._district_number') IS NOT NULL
+                    GROUP BY district_num
+                """, (dataset_id,))
+
+            raw_values = {}
+            for row in cursor.fetchall():
+                if row[0] and row[1] is not None:
+                    raw_values[row[0]] = float(row[1])
+
+        # Apply normalization
+        normalized = self._normalize_values(raw_values, comp.normalize, districts)
+
+        return normalized
+
+    def _normalize_values(
+        self,
+        values: Dict[str, float],
+        norm_type: NormalizationType,
+        districts: List[Dict[str, Any]]
+    ) -> Dict[str, float]:
+        """Normalize values according to the normalization type"""
+        if not values:
+            return {}
+
+        if norm_type == NormalizationType.NONE:
+            return values
+
+        if norm_type == NormalizationType.POPULATION:
+            # Per 1000 residents
+            normalized = {}
+            for district_num, value in values.items():
+                pop = self._population_cache.get(district_num, 0)
+                if pop > 0:
+                    normalized[district_num] = (value / pop) * 1000
+                else:
+                    normalized[district_num] = 0
+            return normalized
+
+        if norm_type == NormalizationType.AREA:
+            # Per km²
+            normalized = {}
+            for district_num, value in values.items():
+                area = self._area_cache.get(district_num, 0)
+                if area > 0:
+                    normalized[district_num] = value / area
+                else:
+                    normalized[district_num] = 0
+            return normalized
+
+        if norm_type == NormalizationType.MINMAX:
+            # Scale to 0-100
+            if not values:
+                return {}
+            min_val = min(values.values())
+            max_val = max(values.values())
+            if max_val == min_val:
+                return {k: 50 for k in values}
+            return {
+                k: ((v - min_val) / (max_val - min_val)) * 100
+                for k, v in values.items()
+            }
+
+        if norm_type == NormalizationType.ZSCORE:
+            # Standard deviations from mean
+            if not values:
+                return {}
+            mean = sum(values.values()) / len(values)
+            std = (sum((v - mean) ** 2 for v in values.values()) / len(values)) ** 0.5
+            if std == 0:
+                return {k: 0 for k in values}
+            return {k: (v - mean) / std for k, v in values.items()}
+
+        return values
+
+    def _combine_components_with_breakdown(
+        self,
+        components: List[IndexComponent],
+        component_values: List[Dict[str, float]],
+        raw_values: List[Dict[str, float]],
+        districts: List[Dict[str, Any]]
+    ) -> Tuple[Dict[str, float], Dict[str, List[Dict[str, Any]]]]:
+        """Combine multiple components into a final score with per-district breakdown"""
+        district_nums = [d["number"] for d in districts]
+
+        # Normalize all component values to 0-100 scale for fair combination
+        normalized_components = []
+        for values in component_values:
+            if values:
+                min_val = min(values.values()) if values else 0
+                max_val = max(values.values()) if values else 0
+                if max_val > min_val:
+                    normalized = {
+                        k: ((v - min_val) / (max_val - min_val)) * 100
+                        for k, v in values.items()
+                    }
+                else:
+                    normalized = {k: 50 for k in values}
+                normalized_components.append(normalized)
+            else:
+                normalized_components.append({})
+
+        # Calculate weighted sum with breakdown
+        final_scores = {}
+        breakdown = {}  # Per-district component breakdown
+
+        for district_num in district_nums:
+            score = 0
+            weight_sum = 0
+            district_breakdown = []
+
+            for i, comp in enumerate(components):
+                if i < len(normalized_components):
+                    raw_value = normalized_components[i].get(district_num, 50)
+                    # Negative weight means inverse (higher raw = lower score)
+                    effective_value = 100 - raw_value if comp.weight < 0 else raw_value
+                    contribution = effective_value * abs(comp.weight)
+                    score += contribution
+                    weight_sum += abs(comp.weight)
+
+                    # Get normalization type as string
+                    norm_type = comp.normalize.value if isinstance(comp.normalize, NormalizationType) else comp.normalize
+
+                    # Get the raw values for this district
+                    raw_data = raw_values[i].get(district_num, {}) if i < len(raw_values) else {}
+                    raw_count = raw_data.get("count", 0)
+                    raw_denominator = raw_data.get("denominator")
+
+                    district_breakdown.append({
+                        "label": comp.label or comp.dataset_pattern,
+                        "value": round(raw_value, 1),
+                        "count": round(raw_count),
+                        "denominator": round(raw_denominator, 1) if raw_denominator else None,
+                        "weight": comp.weight,
+                        "contribution": round(contribution, 1),
+                        "normalize": norm_type,
+                        "aggregation": comp.aggregation
+                    })
+
+            if weight_sum > 0:
+                final_scores[district_num] = score / weight_sum
+            else:
+                final_scores[district_num] = 50
+
+            breakdown[district_num] = district_breakdown
+
+        return final_scores, breakdown
+
+    def get_available_datasets(self) -> List[Dict[str, Any]]:
+        """Get datasets that can be used in custom indices"""
+        with self.db.get_connection() as conn:
+            cursor = conn.execute("""
+                SELECT id, title, feature_count, is_district_specific, has_geometry
+                FROM datasets
+                WHERE feature_count > 0
+                ORDER BY
+                    CASE WHEN title LIKE '%Indikatorenatlas%' THEN 0 ELSE 1 END,
+                    title
+            """)
+
+            return [
+                {
+                    "id": row[0],
+                    "title": row[1],
+                    "feature_count": row[2],
+                    "is_district_specific": bool(row[3]),
+                    "has_geometry": bool(row[4]),
+                }
+                for row in cursor.fetchall()
+            ]

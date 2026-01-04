@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Optional
 
 import requests
-from dotenv import load_dotenv
+# from dotenv import load_dotenv
 
 from .vector_store import get_chroma_client, upsert_datasets
 
@@ -15,7 +15,7 @@ CKAN_BASE_URL = "https://opendata.muenchen.de/api/3/action"
 USABLE_FORMATS = {"CSV", "WFS", "GEOJSON", "JSON"}
 
 # Ensure environment variables from `.env` are loaded when running ingestion
-load_dotenv()
+# load_dotenv()
 
 
 @dataclass
