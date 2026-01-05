@@ -48,64 +48,6 @@ class IndexPreset:
 # PRESET INDICES
 # =============================================================================
 
-BIKE_FRIENDLY_INDEX = IndexPreset(
-    id="bike-friendly",
-    name="Bike-Friendly",
-    description="How bike-friendly is each district based on infrastructure, parking, and traffic calming",
-    icon="🚴",
-    higher_is_better=True,
-    components=[
-        IndexComponent(
-            dataset_pattern="Radverkehrsanlagen im Straßenunterhalt",
-            column=None,
-            weight=0.25,
-            aggregation="count",
-            normalize=NormalizationType.AREA,
-            label="Bike paths"
-        ),
-        IndexComponent(
-            dataset_pattern="Fahrradparken mit Standardmaßen",
-            column=None,
-            weight=0.20,
-            aggregation="count",
-            normalize=NormalizationType.POPULATION,
-            label="Bike parking"
-        ),
-        IndexComponent(
-            dataset_pattern="Tempo-30-Zone",
-            column=None,
-            weight=0.15,
-            aggregation="count",
-            normalize=NormalizationType.AREA,
-            label="Tempo-30 zones"
-        ),
-        IndexComponent(
-            dataset_pattern="Fahrradstraßen",
-            column=None,
-            weight=0.15,
-            aggregation="count",
-            normalize=NormalizationType.AREA,
-            label="Bike streets"
-        ),
-        IndexComponent(
-            dataset_pattern="Radentscheidmaßnahmen",
-            column=None,
-            weight=0.10,
-            aggregation="count",
-            normalize=NormalizationType.AREA,
-            label="Planned improvements"
-        ),
-        IndexComponent(
-            dataset_pattern="Motorisierungsgrad Personenkraftwagen",
-            column="Indikatorwert",
-            weight=-0.15,
-            aggregation="avg",
-            normalize=NormalizationType.MINMAX,
-            label="Car ownership (inverse)"
-        ),
-    ]
-)
-
 CHILD_FRIENDLY_INDEX = IndexPreset(
     id="child-friendly",
     name="Child-Friendly",
@@ -206,48 +148,6 @@ SENIOR_FRIENDLY_INDEX = IndexPreset(
     ]
 )
 
-GREEN_SPACES_INDEX = IndexPreset(
-    id="green-spaces",
-    name="Green & Recreation",
-    description="Access to parks, swimming, and outdoor recreation",
-    icon="🌳",
-    higher_is_better=True,
-    components=[
-        IndexComponent(
-            dataset_pattern="Öffentliche Spielplätze",
-            column=None,
-            weight=0.25,
-            aggregation="count",
-            normalize=NormalizationType.POPULATION,
-            label="Playgrounds"
-        ),
-        IndexComponent(
-            dataset_pattern="Baden in der Isar",
-            column=None,
-            weight=0.25,
-            aggregation="count",
-            normalize=NormalizationType.AREA,
-            label="Swimming spots"
-        ),
-        IndexComponent(
-            dataset_pattern="Schwimmbäder in München",
-            column=None,
-            weight=0.25,
-            aggregation="count",
-            normalize=NormalizationType.POPULATION,
-            label="Swimming pools"
-        ),
-        IndexComponent(
-            dataset_pattern="Trinkbrunnen",
-            column=None,
-            weight=0.25,
-            aggregation="count",
-            normalize=NormalizationType.AREA,
-            label="Drinking fountains"
-        ),
-    ]
-)
-
 SERVICES_INDEX = IndexPreset(
     id="services",
     name="Public Services",
@@ -300,10 +200,8 @@ SERVICES_INDEX = IndexPreset(
 
 # All available presets
 INDEX_PRESETS = {
-    "bike-friendly": BIKE_FRIENDLY_INDEX,
     "child-friendly": CHILD_FRIENDLY_INDEX,
     "senior-friendly": SENIOR_FRIENDLY_INDEX,
-    "green-spaces": GREEN_SPACES_INDEX,
     "services": SERVICES_INDEX,
 }
 
