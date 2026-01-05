@@ -133,3 +133,31 @@
   cursor: default;
 }
 
+.chat-status {
+  font-size: 0.75rem;
+  opacity: 0.85;
+}
+
+.visualization-indicator {
+  margin-top: 6px;
+  padding: 4px 8px;
+  background: rgba(0, 102, 204, 0.1);
+  border-radius: 4px;
+  font-size: 0.8rem;
+  color: #0066cc;
+  display: inline-block;
+}
+
+.chat-test {
+  background: #f0f0f0;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 8px 10px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.chat-test:hover {
+  background: #e0e0e0;
+}
+

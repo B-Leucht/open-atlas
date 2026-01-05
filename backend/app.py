@@ -1019,6 +1019,12 @@ def chat():
     """
     Send a natural language query to the AI agent.
     The agent finds relevant datasets and analyzes them.
+
+    Returns structured response including:
+    - answer: The text response
+    - query_type: "single_dataset", "multi_dataset", or "index_creation"
+    - index_result: Full index data (if index_creation query)
+    - geo_data: Geographic data for map display (if available)
     """
     try:
         data = request.get_json()
@@ -1030,13 +1036,26 @@ def chat():
             return jsonify({'success': False, 'error': 'Query cannot be empty'}), 400
 
         agent = get_chat_agent()
-        answer = agent.query(query)
+        result = agent.query(query)
 
-        return jsonify({
+        # Build response with structured data
+        response = {
             'success': True,
             'query': query,
-            'answer': answer
-        })
+            'answer': result.get('answer', ''),
+            'query_type': result.get('query_type', 'single_dataset'),
+        }
+
+        # Include index result if available (for map visualization)
+        if result.get('index_result'):
+            response['index_result'] = result['index_result']
+            response['suggested_index'] = result.get('suggested_index')
+
+        # Include geographic data if available
+        if result.get('geo_data'):
+            response['geo_data'] = result['geo_data']
+
+        return jsonify(response)
 
     except Exception as e:
         print(f"Chat error: {e}")

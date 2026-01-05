@@ -269,3 +269,420 @@ def query_geospatial(url: str, sql_query: str) -> Dict[str, Any]:
         }
     finally:
         conn.close()
+
+
+# =============================================================================
+# QUERY CLASSIFICATION
+# =============================================================================
+
+# Keywords for classification fallback heuristics
+INDEX_KEYWORDS = [
+    "best", "worst", "rank", "ranking", "score", "rate", "rating",
+    "most", "least", "top districts", "which district is",
+    "friendliest", "safest", "greenest", "livable", "livability"
+]
+
+MULTI_KEYWORDS = [
+    "compare", "comparison", "versus", " vs ", " and ",
+    "both", "relationship", "correlation", "between",
+    "across datasets", "multiple"
+]
+
+
+def classify_query(user_query: str) -> Dict[str, Any]:
+    """
+    Classify user query to determine processing path.
+
+    Returns:
+        {
+            "query_type": "single_dataset" | "multi_dataset" | "index_creation",
+            "reasoning": str,
+            "confidence": float
+        }
+    """
+    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.0)
+
+    system_msg = AIMessage(content="""You classify user queries about Munich open data into exactly ONE category.
+
+Categories:
+1. SINGLE_DATASET - Simple factual queries about one topic
+   Examples: "How many schools are in Munich?", "Show me all parks", "Where are the playgrounds?"
+
+2. MULTI_DATASET - Comparative queries requiring data from multiple sources
+   Examples: "Compare schools and hospitals by district", "What's the relationship between parks and population?"
+   Keywords: compare, versus, both, relationship, correlation
+
+3. INDEX_CREATION - Ranking/scoring queries that need to combine multiple factors
+   Examples: "Which district is best for families?", "Rank districts by livability", "Score districts for seniors"
+   Keywords: best, worst, rank, score, rate, top, most, least, -friendliest, -safest
+
+Return ONLY valid JSON:
+{"query_type": "single_dataset" | "multi_dataset" | "index_creation", "reasoning": "brief explanation", "confidence": 0.0-1.0}""")
+
+    user_msg = HumanMessage(content=f"Classify this query: {user_query}")
+
+    try:
+        response = llm.invoke([system_msg, user_msg])
+        content = response.content.strip()
+
+        # Parse JSON response
+        if content.startswith("```"):
+            content = content.split("```")[1]
+            if content.startswith("json"):
+                content = content[4:]
+        content = content.strip()
+
+        result = json.loads(content)
+
+        # Validate query_type
+        valid_types = ["single_dataset", "multi_dataset", "index_creation"]
+        if result.get("query_type") not in valid_types:
+            raise ValueError(f"Invalid query_type: {result.get('query_type')}")
+
+        return result
+
+    except Exception as e:
+        logger.warning(f"LLM classification failed, using heuristics: {e}")
+        return _classify_query_heuristic(user_query)
+
+
+def _classify_query_heuristic(user_query: str) -> Dict[str, Any]:
+    """Fallback classification using keyword matching"""
+    query_lower = user_query.lower()
+
+    # Check for index creation keywords first (most specific)
+    for kw in INDEX_KEYWORDS:
+        if kw in query_lower:
+            return {
+                "query_type": "index_creation",
+                "reasoning": f"Detected ranking keyword: '{kw}'",
+                "confidence": 0.7
+            }
+
+    # Check for multi-dataset keywords
+    for kw in MULTI_KEYWORDS:
+        if kw in query_lower:
+            return {
+                "query_type": "multi_dataset",
+                "reasoning": f"Detected comparison keyword: '{kw}'",
+                "confidence": 0.7
+            }
+
+    # Default to single dataset
+    return {
+        "query_type": "single_dataset",
+        "reasoning": "No comparison or ranking keywords detected",
+        "confidence": 0.6
+    }
+
+
+# =============================================================================
+# MULTI-DATASET ANALYSIS
+# =============================================================================
+
+def analyze_multiple_datasets(
+    datasets: List[Dict[str, Any]],
+    user_query: str
+) -> Dict[str, Any]:
+    """
+    Analyze multiple datasets and produce combined insights.
+
+    Args:
+        datasets: List of dataset metadata with resources
+        user_query: Original user question
+
+    Returns:
+        {
+            "individual_results": List of per-dataset analysis results,
+            "combined_analysis": LLM-synthesized markdown,
+            "summary_table": Comparative markdown table
+        }
+    """
+    individual_results = []
+
+    # Analyze each dataset
+    for dataset in datasets:
+        resource = dataset.get("selected_resource") or {}
+        fmt = (resource.get("format") or "").upper()
+        url = resource.get("url")
+
+        if not url:
+            result = {
+                "dataset_title": dataset.get("title"),
+                "error": "no_url",
+                "error_message": "No resource URL available"
+            }
+        elif fmt == "CSV":
+            result = analyze_csv(url, user_query)
+            result["dataset_title"] = dataset.get("title")
+        elif fmt in {"GEOJSON", "WFS", "JSON"}:
+            result = analyze_geospatial(url, user_query)
+            result["dataset_title"] = dataset.get("title")
+        else:
+            result = {
+                "dataset_title": dataset.get("title"),
+                "error": "unsupported_format",
+                "error_message": f"Format '{fmt}' not supported"
+            }
+
+        individual_results.append(result)
+
+    # Filter successful results for synthesis
+    successful_results = [r for r in individual_results if not r.get("error")]
+
+    if not successful_results:
+        return {
+            "individual_results": individual_results,
+            "combined_analysis": "Could not analyze any of the selected datasets.",
+            "summary_table": ""
+        }
+
+    # Synthesize results with LLM
+    combined_analysis = _synthesize_multi_results(successful_results, user_query)
+
+    return {
+        "individual_results": individual_results,
+        "combined_analysis": combined_analysis,
+        "summary_table": _create_summary_table(successful_results)
+    }
+
+
+def _synthesize_multi_results(results: List[Dict[str, Any]], user_query: str) -> str:
+    """Use LLM to synthesize insights from multiple dataset analyses"""
+    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.1)
+
+    # Build context from results
+    results_text = ""
+    for i, result in enumerate(results, 1):
+        results_text += f"\n### Dataset {i}: {result.get('dataset_title', 'Unknown')}\n"
+        results_text += f"SQL: {result.get('sql_query', 'N/A')}\n"
+        results_text += f"Rows: {result.get('row_count', 0)}\n"
+        results_text += f"Preview:\n{result.get('preview_markdown', 'No data')}\n"
+
+    system_msg = AIMessage(content="""You are a data analyst synthesizing insights from multiple Munich datasets.
+
+Instructions:
+- Compare and contrast the datasets
+- Identify patterns across the data
+- Answer the user's question using ONLY the provided data
+- Present key findings in a clear, organized way
+- Use markdown formatting
+- DO NOT hallucinate data not shown in the previews""")
+
+    user_msg = HumanMessage(content=f"""User question: {user_query}
+
+Dataset analyses:
+{results_text}
+
+Synthesize these results to answer the question.""")
+
+    response = llm.invoke([system_msg, user_msg])
+    return response.content
+
+
+def _create_summary_table(results: List[Dict[str, Any]]) -> str:
+    """Create a summary comparison table from multiple results"""
+    if not results:
+        return ""
+
+    rows = []
+    for result in results:
+        rows.append({
+            "Dataset": result.get("dataset_title", "Unknown"),
+            "Rows": result.get("row_count", 0),
+            "Columns": len(result.get("columns", [])),
+            "Type": result.get("kind", "unknown")
+        })
+
+    df = pd.DataFrame(rows)
+    return df.to_markdown(index=False)
+
+
+# =============================================================================
+# INDEX DESIGN AND CALCULATION
+# =============================================================================
+
+# Normalization suggestion rules
+NORMALIZATION_RULES = {
+    "population": [
+        "playground", "school", "kindergarten", "hospital", "doctor",
+        "pharmacy", "library", "community center", "childcare",
+        "senior center", "care facility", "sports", "kita", "schule"
+    ],
+    "area": [
+        "traffic calming", "tempo 30", "green space", "park",
+        "danger", "accident", "wifi", "recycling", "parking",
+        "grünfläche", "verkehr"
+    ],
+    "minmax": [
+        "indicator", "rate", "ratio", "percentage", "density",
+        "index", "score", "indikator", "dichte", "anteil"
+    ]
+}
+
+
+def design_index(
+    user_query: str,
+    available_datasets: List[Dict[str, Any]]
+) -> Dict[str, Any]:
+    """
+    AI-driven index design with sensible defaults.
+
+    Args:
+        user_query: User's question (e.g., "Which district is best for families?")
+        available_datasets: List of datasets from IndexCalculator.get_available_datasets()
+
+    Returns:
+        {
+            "name": str,
+            "description": str,
+            "components": List of component specs,
+            "higher_is_better": bool,
+            "reasoning": str
+        }
+    """
+    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.2)
+
+    # Format available datasets for the prompt
+    dataset_list = "\n".join([
+        f"- {d['title']} (ID: {d['id']}, {d['feature_count']} features)"
+        for d in available_datasets[:50]  # Limit to avoid token overflow
+    ])
+
+    system_msg = AIMessage(content="""You design composite indices for ranking Munich districts.
+
+TASK: Create an index that answers the user's question by combining 3-6 relevant datasets.
+
+OUTPUT FORMAT (JSON only):
+{
+    "name": "Index Name",
+    "description": "What this index measures",
+    "higher_is_better": true,
+    "components": [
+        {
+            "dataset_pattern": "Exact or partial title to match",
+            "column": null,
+            "weight": 0.25,
+            "aggregation": "count",
+            "normalize": "population",
+            "label": "Human-readable name"
+        }
+    ],
+    "reasoning": "Why these datasets and weights were chosen"
+}
+
+RULES:
+- dataset_pattern: Use exact title or distinctive substring from the available datasets
+- column: null for counting features, or column name for value aggregation (use "Indikatorwert" for indicator datasets)
+- weight: -1.0 to 1.0. Negative weights invert the metric (e.g., danger spots reduce family-friendliness)
+- aggregation: "count" (count features), "avg" (average values), "sum"
+- normalize:
+  * "population" - Per 1000 residents. Use for: playgrounds, schools, healthcare, services
+  * "area" - Per km². Use for: traffic calming, green spaces, parking
+  * "minmax" - Scale 0-100. Use for: pre-calculated indicators (Indikatorwert)
+
+WEIGHT GUIDELINES:
+- Core factors: 0.25-0.35
+- Secondary factors: 0.15-0.25
+- Minor factors: 0.05-0.15
+- Weights should sum to approximately 1.0 (absolute values)""")
+
+    user_msg = HumanMessage(content=f"""Design an index for: "{user_query}"
+
+Available datasets:
+{dataset_list}
+
+Return ONLY valid JSON.""")
+
+    try:
+        response = llm.invoke([system_msg, user_msg])
+        content = response.content.strip()
+
+        # Parse JSON
+        if content.startswith("```"):
+            content = content.split("```")[1]
+            if content.startswith("json"):
+                content = content[4:]
+        content = content.strip()
+
+        result = json.loads(content)
+
+        # Validate required fields
+        if "components" not in result or not result["components"]:
+            raise ValueError("No components in index design")
+
+        # Ensure defaults
+        result.setdefault("name", "Custom Index")
+        result.setdefault("description", f"Index based on: {user_query}")
+        result.setdefault("higher_is_better", True)
+        result.setdefault("reasoning", "AI-designed index")
+
+        # Validate and clean components
+        for comp in result["components"]:
+            comp.setdefault("column", None)
+            comp.setdefault("weight", 0.2)
+            comp.setdefault("aggregation", "count")
+            comp.setdefault("normalize", "minmax")
+            comp.setdefault("label", comp.get("dataset_pattern", "Component"))
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Index design failed: {e}")
+        return {
+            "name": "Custom Index",
+            "description": f"Index for: {user_query}",
+            "higher_is_better": True,
+            "components": [],
+            "reasoning": f"Design failed: {str(e)}",
+            "error": str(e)
+        }
+
+
+def calculate_index_from_spec(index_spec: Dict[str, Any], db=None) -> Dict[str, Any]:
+    """
+    Calculate an index from an AI-designed specification.
+
+    Args:
+        index_spec: Index design from design_index()
+        db: Optional database instance
+
+    Returns:
+        Index calculation result from IndexCalculator
+    """
+    # Import here to avoid circular imports
+    import sys
+    import os
+    sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+
+    from data.indices import IndexComponent, IndexCalculator, NormalizationType
+
+    components = []
+    for c in index_spec.get("components", []):
+        # Convert normalize string to enum
+        norm_str = c.get("normalize", "minmax").lower()
+        try:
+            norm_type = NormalizationType(norm_str)
+        except ValueError:
+            norm_type = NormalizationType.MINMAX
+
+        components.append(IndexComponent(
+            dataset_pattern=c.get("dataset_pattern", ""),
+            column=c.get("column"),
+            weight=float(c.get("weight", 0.2)),
+            aggregation=c.get("aggregation", "count"),
+            normalize=norm_type,
+            label=c.get("label", "")
+        ))
+
+    if not components:
+        return {
+            "success": False,
+            "error": "No valid components in index specification"
+        }
+
+    calculator = IndexCalculator(db)
+    return calculator.calculate_index(
+        components=components,
+        name=index_spec.get("name", "Custom Index")
+    )
