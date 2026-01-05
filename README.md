@@ -181,6 +181,14 @@ This will:
 - **CKAN API**: https://opendata.muenchen.de/api/3/action
 - **Supported formats**: WFS, GeoJSON, CSV, JSON
 
+## Attribution
+
+This application uses open data provided by:
+
+**Landeshauptstadt München – opendata.muenchen.de**
+
+Licensed under [Datenlizenz Deutschland – Namensnennung – Version 2.0](https://www.govdata.de/dl-de/by-2-0)
+
 ## License
 
 This project is for educational purposes.
