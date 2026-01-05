@@ -1,253 +1,185 @@
 # Open Atlas - Munich City Data Explorer
 
-A full-stack web application that aggregates and searches across Munich city datasets, featuring an AI-powered chatbot that can query and analyze data from the Munich Open Data portal.
+A full-stack web application for exploring Munich's open data with district-level analysis, composite indices, and an AI-powered chatbot.
 
 ## Features
 
-- **Unified Search**: Search across all datasets from a single interface
-- **Category Filtering**: Filter results by data category
-- **Dual View Modes**:
-  - List view for detailed information
-  - Map view for geographic visualization
-- **AI Chatbot**: Natural language interface to query Munich Open Data
-  - Semantic search across the entire Munich Open Data catalog
-  - Automatic dataset selection and analysis
-  - Supports CSV and geospatial data analysis
-- **Real-time Statistics**: View data counts and search results
-- **Responsive Design**: Works on desktop and mobile devices
+- **District-Level Analysis**: Explore data aggregated by Munich's 25 districts with choropleth visualization
+- **Composite Indices**: Pre-built indices (Child-Friendly, Senior-Friendly, Public Services) that combine multiple datasets to score districts
+- **Custom Index Builder**: Create your own composite indices by combining datasets with custom weights
+- **AI Chatbot**: Natural language interface powered by OpenAI to query and analyze Munich data
+- **Interactive Map**: Choropleth maps showing district scores with click-to-explore functionality
+- **Unified Search**: Search across 100+ datasets from a single interface
+- **Real-time Data Sync**: Automatic synchronization with Munich Open Data portal
 
 ## Tech Stack
 
-### Main Backend (Flask)
+### Backend (Flask)
 - Python 3.12+
-- Flask (REST API)
-- Flask-CORS
-
-### Chatbot Backend (FastAPI)
-- FastAPI + Uvicorn
-- LangChain / LangGraph (AI agent orchestration)
-- ChromaDB (vector store for semantic search)
+- Flask with Flask-CORS
+- SQLite database with spatial data support
+- ChromaDB for vector search (chatbot)
 - OpenAI API (embeddings and LLM)
-- DuckDB (data analysis with spatial extension)
-- Pandas / GeoPandas (data processing)
 
-### Frontend
+### Frontend (React)
 - React 18
-- Axios (HTTP client)
 - Leaflet & React-Leaflet (Maps)
-- CSS3
-
-## Installation
-
-### Prerequisites
-- Python 3.12 or higher
-- Node.js 16 or higher
-- npm or yarn
-- OpenAI API key (for chatbot functionality)
-
-### Main Backend Setup
-
-1. Navigate to the backend directory:
-```bash
-cd backend
-```
-
-2. Create a virtual environment (recommended):
-```bash
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
-
-3. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
-
-4. Start the Flask server:
-```bash
-python app.py
-```
-
-The backend API will be available at `http://localhost:5001`
-
-### Chatbot Backend Setup
-
-1. Navigate to the chatbot-backend directory:
-```bash
-cd backend/chatbot-backend
-```
-
-2. Create a virtual environment (recommended):
-```bash
-python -m venv .venv
-source .venv/bin/activate
-```
-
-3. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
-
-4. Set your OpenAI API key by creating a `.env` file:
-```bash
-OPENAI_API_KEY=sk-...
-```
-
-5. Run catalog ingestion to populate the vector store:
-```bash
-python -m src.ingestion
-```
-
-6. Start the FastAPI server:
-```bash
-python api.py
-```
-
-The chatbot API will be available at `http://localhost:8000`
-
-### Frontend Setup
-
-1. Navigate to the frontend directory:
-```bash
-cd frontend
-```
-
-2. Install dependencies:
-```bash
-npm install
-```
-
-3. Start the development server:
-```bash
-npm start
-```
-
-The frontend will automatically open in your browser at `http://localhost:3000`
-
-### Quick Start
-
-Use the included start script to launch the main backend and frontend together:
-```bash
-./start.sh
-```
-
-Note: The chatbot backend needs to be started separately.
-
-## Usage
-
-1. **Start all servers**: Make sure the main backend (Flask), chatbot backend (FastAPI), and frontend (React) servers are running
-2. **Search**: Enter keywords in the search bar (e.g., "Markt", "Schwabing", "Parkplatz")
-3. **Filter**: Click on category buttons to filter by data type
-4. **Toggle Views**: Switch between List and Map view to see results differently
-5. **Chat**: Click the chat button to ask natural language questions about Munich data
-6. **Explore**: Click on map markers or read list details to learn more
-
-## API Endpoints
-
-### Main Backend (Port 5001)
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/search` | GET | Search across all datasets (`q`, `category` params) |
-| `/api/categories` | GET | Get all available categories with counts |
-| `/api/stats` | GET | Get statistics about the data |
-| `/api/health` | GET | Health check endpoint |
-
-### Chatbot Backend (Port 8000)
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/` | GET | API information |
-| `/health` | GET | Health check endpoint |
-| `/query` | POST | Submit a natural language query |
-| `/docs` | GET | Swagger UI documentation |
-
-Example chatbot query:
-```bash
-curl -X POST "http://localhost:8000/query" \
-  -H "Content-Type: application/json" \
-  -d '{"query": "How many bike parking spots are in Schwabing?"}'
-```
+- Axios (HTTP client)
 
 ## Project Structure
 
 ```
 open-atlas/
 ├── backend/
-│   ├── app.py                    # Flask application
-│   ├── requirements.txt          # Python dependencies
-│   ├── venv/                     # Virtual environment
-│   └── chatbot-backend/
-│       ├── api.py                # FastAPI application
-│       ├── requirements.txt      # Chatbot dependencies
-│       ├── .chroma/              # ChromaDB vector store
-│       └── src/
-│           ├── agent.py          # LangGraph agent
-│           ├── ingestion.py      # Catalog ingestion
-│           └── vector_store.py   # ChromaDB operations
+│   ├── app.py                 # Flask application (all API endpoints)
+│   ├── requirements.txt       # Python dependencies
+│   ├── chat/                  # AI chatbot module
+│   │   ├── agent.py           # Chat agent with tools
+│   │   ├── tools.py           # Agent tools (search, query, etc.)
+│   │   └── vector_store.py    # ChromaDB for semantic search
+│   └── data/                  # Data layer
+│       ├── database.py        # SQLite database operations
+│       ├── districts.py       # District boundary service
+│       ├── indices.py         # Composite index calculator
+│       ├── models.py          # Data models
+│       ├── parsers.py         # Data format parsers
+│       ├── sync.py            # Data synchronization
+│       └── openatlas.db.gz    # Pre-built database (compressed)
 ├── frontend/
-│   ├── public/
-│   │   └── index.html
 │   ├── src/
+│   │   ├── App.js             # Main application
 │   │   ├── components/
-│   │   │   ├── SearchBar.js
-│   │   │   ├── CategoryFilter.js
-│   │   │   ├── ResultsList.js
-│   │   │   ├── MapView.js
-│   │   │   ├── Stats.js
-│   │   │   └── Chatbot.js
-│   │   ├── App.js
-│   │   ├── App.css
-│   │   ├── index.js
-│   │   └── index.css
+│   │   │   ├── MapView.js     # Interactive map with choropleth
+│   │   │   ├── DistrictDataSelector.js  # Index selection UI
+│   │   │   ├── Chatbot.js     # AI chat interface
+│   │   │   ├── ResultsList.js # Search results
+│   │   │   └── ...
+│   │   └── ...
 │   └── package.json
-├── resources/                    # Resource files
-├── start.sh                      # Quick start script
+├── start.sh                   # Quick start script
 └── README.md
 ```
 
-## Data Sources
+## Installation
 
-The application accesses data from the Munich Open Data portal:
-- **CKAN API**: `https://opendata.muenchen.de/api/3/action`
-- **Supported formats**: CSV, WFS, GeoJSON, JSON
+### Prerequisites
+- Python 3.12+
+- Node.js 16+
+- OpenAI API key (for chatbot)
 
-The chatbot ingestion process indexes all available datasets for semantic search.
+### Backend Setup
+
+```bash
+cd backend
+
+# Create virtual environment
+python3 -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Extract the pre-built database
+gunzip -k data/openatlas.db.gz
+
+# Set OpenAI API key (for chatbot)
+export OPENAI_API_KEY=sk-...
+
+# Start the server
+python app.py
+```
+
+The API will be available at `http://localhost:5001`
+
+### Frontend Setup
+
+```bash
+cd frontend
+
+# Install dependencies
+npm install
+
+# Start development server
+npm start
+```
+
+The frontend will open at `http://localhost:3000`
+
+### Quick Start
+
+```bash
+./start.sh
+```
+
+## API Endpoints
+
+### Search & Data
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/search` | GET | Search across all datasets |
+| `/api/categories` | GET | Get available categories |
+| `/api/stats` | GET | Database statistics |
+| `/api/datasets` | GET | List all datasets |
+| `/api/datasets/<id>/features` | GET | Get features from a dataset |
+
+### Districts
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/districts` | GET | Get all district boundaries |
+| `/api/districts/<number>` | GET | Get single district |
+| `/api/districts/<number>/data` | GET | Get data for a district |
+
+### Composite Indices
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/indices/presets` | GET | List available index presets |
+| `/api/indices/presets/<id>` | GET | Get preset details |
+| `/api/indices/calculate/<id>` | GET | Calculate a preset index |
+| `/api/indices/calculate` | POST | Calculate a custom index |
+| `/api/indices/datasets` | GET | Datasets available for indices |
+
+### Chat
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/chat` | POST | Send message to AI chatbot |
+
+## Composite Indices
+
+The application includes pre-built composite indices that score each district:
+
+- **Child-Friendly**: Playgrounds, childcare facilities, traffic calming, safety
+- **Senior-Friendly**: Senior centers, healthcare access, accessibility
+- **Public Services**: WiFi, toilets, recycling, community centers
+
+Each index combines multiple datasets with configurable weights and normalization (per capita, per area, etc.).
+
+## Data Synchronization
+
+To sync fresh data from Munich Open Data portal:
+
+```bash
+cd backend
+python -c "from data.sync import DataSync; DataSync().full_sync()"
+```
+
+This will:
+1. Fetch all dataset metadata from CKAN API
+2. Download and parse geospatial data (WFS, GeoJSON, CSV)
+3. Assign features to districts based on geometry
+4. Update the SQLite database
 
 ## Development
 
-### Main Backend Development
-- The Flask server runs in debug mode by default
-- Changes to Python files will automatically reload the server
-- API is accessible at `http://localhost:5001/api`
+- Flask runs in debug mode with auto-reload
+- React dev server has hot-reload enabled
+- Database is stored in `backend/data/openatlas.db`
+- Vector store is in `backend/data/.chroma`
 
-### Chatbot Backend Development
-- FastAPI auto-reloads on file changes when run with uvicorn
-- API documentation available at `http://localhost:8000/docs`
-- Vector store is persisted in `.chroma` directory
+## Data Sources
 
-### Frontend Development
-- React development server has hot-reload enabled
-- Changes to React components will update instantly
-
-## Troubleshooting
-
-### CORS Issues
-- Flask-CORS and FastAPI CORS middleware are configured to allow all origins in development
-- For production, update the allowed origins lists
-
-### Chatbot Not Responding
-- Verify the OpenAI API key is set correctly in `.env`
-- Run the ingestion script to populate the vector store
-- Check the FastAPI server logs for errors
-
-### Map Not Displaying
-- Check that Leaflet CSS is loaded in index.html
-- Verify coordinates are in the correct format
-
-### Data Not Loading
-- Verify all JSON files are in the correct directory
-- Check the backend console for file loading errors
+- **Munich Open Data Portal**: https://opendata.muenchen.de
+- **CKAN API**: https://opendata.muenchen.de/api/3/action
+- **Supported formats**: WFS, GeoJSON, CSV, JSON
 
 ## License
 
