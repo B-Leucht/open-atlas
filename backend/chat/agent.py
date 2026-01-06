@@ -555,73 +555,87 @@ class ChatAgent:
         index_spec = state.get("suggested_index", {})
         index_result = state.get("index_result", {})
 
-        system_prompt = (
-            "You are a data analyst for the City of Munich Open Data Portal.\n"
-            "You have created a composite index to rank Munich districts.\n"
-            "Present the results clearly with rankings and explanations.\n\n"
-            "Instructions:\n"
-            "- Show the top-ranked and bottom-ranked districts\n"
-            "- Explain what factors contributed to the ranking\n"
-            "- Use a markdown table for the ranking\n"
-            "- Mention the index methodology briefly\n"
-        )
+        # Build pre-formatted tables that we'll append to the response
+        top_table = ""
+        bottom_table = ""
+        stats_text = ""
 
-        if districts_context:
-            system_prompt += f"\nMunich district reference:\n{districts_context}\n"
-
-        # Build index description
-        index_text = f"Index: {index_spec.get('name', 'Custom Index')}\n"
-        index_text += f"Description: {index_spec.get('description', '')}\n"
-        index_text += f"Reasoning: {index_spec.get('reasoning', '')}\n\n"
-
-        # Components
-        index_text += "Components:\n"
-        for comp in index_spec.get("components", []):
-            weight_sign = "+" if comp.get("weight", 0) >= 0 else ""
-            index_text += f"- {comp.get('label', comp.get('dataset_pattern'))}: "
-            index_text += f"weight={weight_sign}{comp.get('weight', 0)}, "
-            index_text += f"normalize={comp.get('normalize', 'minmax')}\n"
-
-        # Results
         if index_result.get("success"):
             scores = index_result.get("scores", {})
             districts_info = index_result.get("districts", [])
-
-            # Create ranking table
-            ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-
-            index_text += "\nDistrict Rankings:\n"
-            index_text += "| Rank | District | Score |\n"
-            index_text += "|------|----------|-------|\n"
-
-            # Map district numbers to names
             district_names = {d["number"]: d["name"] for d in districts_info}
 
-            for rank, (district_num, score) in enumerate(ranked, 1):
-                name = district_names.get(district_num, f"District {district_num}")
-                index_text += f"| {rank} | {name} | {score:.1f} |\n"
+            ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)
 
-            # Stats
+            # Build top 5 table
+            top_table = "**Top 5 Districts:**\n\n"
+            top_table += "| Rank | District | Score |\n"
+            top_table += "|------|----------|-------|\n"
+            for rank, (district_num, score) in enumerate(ranked[:5], 1):
+                name = district_names.get(district_num, f"District {district_num}")
+                top_table += f"| {rank} | {name} | {score:.1f} |\n"
+
+            # Build bottom 5 table
+            bottom_table = "\n**Bottom 5 Districts:**\n\n"
+            bottom_table += "| Rank | District | Score |\n"
+            bottom_table += "|------|----------|-------|\n"
+            for rank, (district_num, score) in enumerate(ranked[-5:], len(ranked) - 4):
+                name = district_names.get(district_num, f"District {district_num}")
+                bottom_table += f"| {rank} | {name} | {score:.1f} |\n"
+
             stats = index_result.get("stats", {})
-            index_text += f"\nStatistics: Min={stats.get('min', 0):.1f}, "
-            index_text += f"Max={stats.get('max', 0):.1f}, "
-            index_text += f"Avg={stats.get('avg', 0):.1f}\n"
-        else:
-            index_text += f"\nError: {index_result.get('error', 'Unknown error')}\n"
+            stats_text = f"\n*Score range: {stats.get('min', 0):.1f} - {stats.get('max', 0):.1f}, Average: {stats.get('avg', 0):.1f}*"
+
+        # Build context for LLM (just for explanation, not tables)
+        system_prompt = (
+            "You are a data analyst for the City of Munich Open Data Portal.\n"
+            "You have created a composite index to rank Munich districts.\n"
+            "Write a brief 2-3 sentence summary explaining:\n"
+            "1. What the index measures\n"
+            "2. Which district ranked highest and why\n"
+            "3. Which district ranked lowest\n\n"
+            "DO NOT include any tables or rankings in your response - those will be added separately.\n"
+            "Keep your response under 100 words.\n"
+        )
+
+        # Build index info for context
+        index_text = f"Index: {index_spec.get('name', 'Custom Index')}\n"
+        index_text += f"Description: {index_spec.get('description', '')}\n\n"
+
+        index_text += "Components used:\n"
+        for comp in index_spec.get("components", []):
+            weight_sign = "+" if comp.get("weight", 0) >= 0 else ""
+            index_text += f"- {comp.get('label', comp.get('dataset_pattern'))}: weight={weight_sign}{comp.get('weight', 0)}\n"
+
+        if index_result.get("success"):
+            scores = index_result.get("scores", {})
+            districts_info = index_result.get("districts", [])
+            district_names = {d["number"]: d["name"] for d in districts_info}
+            ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+
+            index_text += f"\nTop district: {district_names.get(ranked[0][0])} ({ranked[0][1]:.1f})\n"
+            index_text += f"Bottom district: {district_names.get(ranked[-1][0])} ({ranked[-1][1]:.1f})\n"
 
         messages = [
             AIMessage(content=system_prompt),
             HumanMessage(content=(
-                f"User question:\n{user_query}\n\n"
-                f"Index Analysis:\n{index_text}\n\n"
-                "Summarize the ranking results and answer the user's question."
+                f"User question: {user_query}\n\n"
+                f"Index data:\n{index_text}\n\n"
+                "Write a brief summary (no tables)."
             )),
         ]
 
         response = llm.invoke(messages)
 
+        # Combine LLM summary with pre-formatted tables
+        final_response = f"## {index_spec.get('name', 'Custom Index')}\n\n"
+        final_response += response.content.strip() + "\n\n"
+        final_response += top_table
+        final_response += bottom_table
+        final_response += stats_text
+
         new_messages = list(state["messages"])
-        new_messages.append(AIMessage(content=response.content))
+        new_messages.append(AIMessage(content=final_response))
 
         return {**state, "messages": new_messages}
 

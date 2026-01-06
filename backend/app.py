@@ -5,9 +5,16 @@ import requests
 import csv
 import io
 import threading
+import logging
 from typing import List, Dict, Any, Optional
 from functools import lru_cache
 from datetime import datetime
+
+# Configure logging to show INFO level messages
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 
 app = Flask(__name__)
 CORS(app)
@@ -43,13 +50,32 @@ def get_data_sync():
 
 # Chat agent (lazy loading)
 _chat_agent = None
+_vector_store = None
+
+def get_vector_store():
+    """Get vector store, auto-sync from database if empty"""
+    global _vector_store
+    if _vector_store is None:
+        from chat.vector_store import VectorStore
+        _vector_store = VectorStore()
+
+        # Auto-sync if collection is empty
+        try:
+            collection = _vector_store.get_collection()
+            if collection.count() == 0:
+                logging.info("Vector store is empty, syncing from database...")
+                count = _vector_store.sync_from_database(get_db())
+                logging.info(f"Synced {count} datasets to vector store")
+        except Exception as e:
+            logging.warning(f"Could not auto-sync vector store: {e}")
+
+    return _vector_store
 
 def get_chat_agent():
     global _chat_agent
     if _chat_agent is None:
         from chat.agent import ChatAgent
-        from chat.vector_store import VectorStore
-        _chat_agent = ChatAgent(db=get_db(), vector_store=VectorStore())
+        _chat_agent = ChatAgent(db=get_db(), vector_store=get_vector_store())
     return _chat_agent
 
 # ============================================================================

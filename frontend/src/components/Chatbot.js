@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
 import './Chatbot.css';
 
 // Use the same API as the rest of the app
@@ -185,7 +186,13 @@ export default function Chatbot({ onIndexResult, onGeoData }) {
             {messages.map(m => (
               <div key={m.id} className={`chat-message ${m.sender}`}>
                 <div className="chat-bubble">
-                  {m.text}
+                  {m.sender === 'bot' ? (
+                    <div className="markdown-content">
+                      <ReactMarkdown>{m.text}</ReactMarkdown>
+                    </div>
+                  ) : (
+                    m.text
+                  )}
                   {m.hasVisualization && (
                     <div className="visualization-indicator">
                       {m.queryType === 'index_creation' ? '📊 Index shown on map' : '📍 Data shown on map'}

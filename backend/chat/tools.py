@@ -543,10 +543,14 @@ def design_index(
     """
     llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.2)
 
+    # Filter to datasets that actually have features and are useful for indices
+    useful_datasets = [d for d in available_datasets if d.get('feature_count', 0) > 0]
+    logger.info(f"design_index: {len(useful_datasets)} datasets with features (from {len(available_datasets)} total)")
+
     # Format available datasets for the prompt
     dataset_list = "\n".join([
         f"- {d['title']} (ID: {d['id']}, {d['feature_count']} features)"
-        for d in available_datasets[:50]  # Limit to avoid token overflow
+        for d in useful_datasets[:50]  # Limit to avoid token overflow
     ])
 
     system_msg = AIMessage(content="""You design composite indices for ranking Munich districts.
@@ -625,6 +629,10 @@ Return ONLY valid JSON.""")
             comp.setdefault("normalize", "minmax")
             comp.setdefault("label", comp.get("dataset_pattern", "Component"))
 
+        logger.info(f"Designed index '{result.get('name')}' with {len(result['components'])} components:")
+        for comp in result["components"]:
+            logger.info(f"  - pattern='{comp.get('dataset_pattern')}', weight={comp.get('weight')}")
+
         return result
 
     except Exception as e:
@@ -666,8 +674,11 @@ def calculate_index_from_spec(index_spec: Dict[str, Any], db=None) -> Dict[str, 
         except ValueError:
             norm_type = NormalizationType.MINMAX
 
+        pattern = c.get("dataset_pattern", "")
+        logger.info(f"Index component: pattern='{pattern}', weight={c.get('weight')}, normalize={norm_str}")
+
         components.append(IndexComponent(
-            dataset_pattern=c.get("dataset_pattern", ""),
+            dataset_pattern=pattern,
             column=c.get("column"),
             weight=float(c.get("weight", 0.2)),
             aggregation=c.get("aggregation", "count"),
@@ -682,7 +693,14 @@ def calculate_index_from_spec(index_spec: Dict[str, Any], db=None) -> Dict[str, 
         }
 
     calculator = IndexCalculator(db)
-    return calculator.calculate_index(
+    result = calculator.calculate_index(
         components=components,
         name=index_spec.get("name", "Custom Index")
     )
+
+    # Log component matching results
+    if result.get("success"):
+        for comp_info in result.get("components", []):
+            logger.info(f"Component '{comp_info.get('label')}': {comp_info.get('districts_with_data')} districts with data, dataset_id={comp_info.get('dataset_id')}")
+
+    return result
