@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import './Chatbot.css';
 
 // Use the same API as the rest of the app
@@ -188,7 +189,7 @@ export default function Chatbot({ onIndexResult, onGeoData }) {
                 <div className="chat-bubble">
                   {m.sender === 'bot' ? (
                     <div className="markdown-content">
-                      <ReactMarkdown>{m.text}</ReactMarkdown>
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.text}</ReactMarkdown>
                     </div>
                   ) : (
                     m.text
