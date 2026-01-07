@@ -243,7 +243,7 @@ function App() {
     }
   };
 
-  const applyIndexResult = (data) => {
+  const applyIndexResult = (data, suggestedIndex) => {
     setIndexResult(data);
 
     const mapData = {};
@@ -261,9 +261,39 @@ function App() {
       data: mapData,
       min: data.stats.min,
       max: data.stats.max,
-      label: data.name,
+      label: data.name || suggestedIndex?.name || 'Chat Index',
     });
+
+    // Clear any preset selection since this came from chat
+    setSelectedPreset(null);
   };
+
+  // Handle geographic data from chatbot
+  const handleChatGeoData = useCallback((geoData) => {
+    if (!geoData || !geoData.coordinates) return;
+
+    // Convert chat geo data to map features format
+    const features = geoData.coordinates.map((coord, idx) => ({
+      type: 'Feature',
+      geometry: {
+        type: 'Point',
+        coordinates: [coord.longitude, coord.latitude]
+      },
+      properties: {
+        name: coord.name || `Point ${idx + 1}`,
+        ...coord.properties
+      },
+      category: 'chat-result'
+    }));
+
+    setMapFeatures(features);
+    setDatasetMetadata({
+      'chat-result': {
+        title: geoData.dataset_title || 'Chat Results',
+        weight: 1
+      }
+    });
+  }, []);
 
   const clearIndex = () => {
     setSelectedPreset(null);
@@ -550,7 +580,10 @@ function App() {
           districtData={showOverlay ? districtData : null}
           onDistrictClick={indexResult ? handleDistrictClick : null}
         />
-        <Chatbot />
+        <Chatbot
+          onIndexResult={applyIndexResult}
+          onGeoData={handleChatGeoData}
+        />
       </div>
     </div>
   );
