@@ -152,12 +152,16 @@ class ChatAgent:
 
         # Include geographic data from analysis results if available
         analysis_result = final_state.get("analysis_result")
-        if analysis_result and analysis_result.get("coordinates"):
-            response["geo_data"] = {
-                "type": "points",
-                "coordinates": analysis_result["coordinates"],
-                "dataset_title": final_state.get("selected_dataset", {}).get("title")
-            }
+        if analysis_result:
+            coords = analysis_result.get("coordinates")
+            logger.info(f"Analysis result has coordinates: {coords is not None}, count: {len(coords) if coords else 0}")
+            if coords:
+                response["geo_data"] = {
+                    "type": "points",
+                    "coordinates": coords,
+                    "dataset_title": final_state.get("selected_dataset", {}).get("title")
+                }
+                logger.info(f"Added geo_data with {len(coords)} coordinates")
 
         return response
 
@@ -322,14 +326,18 @@ class ChatAgent:
         url = selected_resource.get("url")
         user_query = self._get_last_user_message(state)
 
+        logger.info(f"_node_execute_tool: dataset='{dataset.get('title')}', format='{fmt}', url={url[:80] if url else 'None'}...")
+
         if not url:
             analysis_result = {
                 "error": "no_resource_url",
                 "error_message": "Dataset found, but no usable file URL.",
             }
         elif fmt == "CSV":
+            logger.info(f"Calling analyze_csv for format '{fmt}'")
             analysis_result = analyze_csv(url, user_query)
         elif fmt in {"GEOJSON", "WFS", "JSON"}:
+            logger.info(f"Calling analyze_geospatial for format '{fmt}'")
             analysis_result = analyze_geospatial(url, user_query)
         else:
             analysis_result = {
@@ -337,6 +345,7 @@ class ChatAgent:
                 "error_message": f"Format '{fmt}' is not yet supported.",
             }
 
+        logger.info(f"Analysis completed: kind={analysis_result.get('kind')}, has_coords={analysis_result.get('coordinates') is not None}")
         return {**state, "analysis_result": analysis_result}
 
     # =========================================================================
@@ -452,14 +461,24 @@ class ChatAgent:
         dataset = state.get("selected_dataset")
         analysis = state.get("analysis_result")
 
+        # Extract pre-formatted table from analysis (if any)
+        data_table = ""
+        if analysis and not analysis.get("error"):
+            preview_md = analysis.get('preview_markdown', '')
+            row_count = analysis.get('row_count', 0)
+            if preview_md:
+                data_table = f"\n\n**Data ({row_count} rows):**\n\n{preview_md}\n"
+
         system_prompt = (
             "You are a data analyst for the City of Munich Open Data Portal.\n"
             "You MUST NOT hallucinate data. Only use what's shown in the preview.\n"
             "If the data doesn't answer the question, say so explicitly.\n\n"
             "Instructions:\n"
-            "- Use ONLY the data in the preview for facts and values.\n"
-            "- You MAY use general Munich geographic knowledge for context.\n"
-            "- Present tabular results as markdown tables when suitable.\n"
+            "- Write a brief 2-4 sentence summary answering the user's question.\n"
+            "- Focus on key insights from the data.\n"
+            "- DO NOT include any tables in your response - tables will be added automatically.\n"
+            "- DO NOT list out all the data points - just summarize the main findings.\n"
+            "- Keep your response under 100 words.\n"
         )
 
         if districts_context:
@@ -467,37 +486,49 @@ class ChatAgent:
 
         # Build dataset text
         dataset_text = "No dataset found."
+        dataset_title = "Unknown Dataset"
         if dataset:
-            dataset_text = f"Dataset: {dataset.get('title')}\n"
+            dataset_title = dataset.get('title', 'Unknown Dataset')
+            dataset_text = f"Dataset: {dataset_title}\n"
             dataset_text += f"Description: {dataset.get('description', '')[:500]}\n"
             res = dataset.get("selected_resource") or {}
             if res:
                 dataset_text += f"Resource: {res.get('name')} ({res.get('format')})\n"
 
-        # Build analysis text
-        analysis_text = "No analysis available."
+        # Build analysis context (summary for LLM, not full table)
+        analysis_context = "No analysis available."
         if analysis:
             if analysis.get("error"):
-                analysis_text = f"Error: {analysis.get('error_message')}"
+                analysis_context = f"Error: {analysis.get('error_message')}"
             else:
-                analysis_text = f"SQL: {analysis.get('sql_query', 'N/A')}\n\n"
-                analysis_text += f"Results ({analysis.get('row_count', 0)} rows):\n"
-                analysis_text += analysis.get('preview_markdown', '')
+                analysis_context = f"SQL: {analysis.get('sql_query', 'N/A')}\n"
+                analysis_context += f"Row count: {analysis.get('row_count', 0)}\n"
+                analysis_context += f"Columns: {', '.join(analysis.get('columns', []))}\n"
+                # Provide just the first few rows for context
+                preview_md = analysis.get('preview_markdown', '')
+                if preview_md:
+                    # Take first 500 chars of preview for LLM context
+                    analysis_context += f"Sample data:\n{preview_md[:500]}"
 
         messages = [
             AIMessage(content=system_prompt),
             HumanMessage(content=(
                 f"User question:\n{user_query}\n\n"
                 f"Dataset:\n{dataset_text}\n\n"
-                f"Analysis:\n{analysis_text}\n\n"
-                "Answer the question using ONLY this information."
+                f"Analysis:\n{analysis_context}\n\n"
+                "Write a brief summary (no tables)."
             )),
         ]
 
         response = llm.invoke(messages)
 
+        # Combine LLM summary with pre-formatted data table
+        final_response = f"## {dataset_title}\n\n"
+        final_response += response.content.strip()
+        final_response += data_table
+
         new_messages = list(state["messages"])
-        new_messages.append(AIMessage(content=response.content))
+        new_messages.append(AIMessage(content=final_response))
 
         return {**state, "messages": new_messages}
 

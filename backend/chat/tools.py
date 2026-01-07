@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import Any, Dict, List, Optional
 
 import duckdb
@@ -15,6 +16,211 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langchain_openai import ChatOpenAI
 
 logger = logging.getLogger(__name__)
+
+
+def _extract_coordinates(df: pd.DataFrame, max_points: int = 200) -> Optional[List[Dict[str, float]]]:
+    """
+    Extract coordinates from a DataFrame.
+
+    Checks for:
+    1. Explicit lat/lon columns
+    2. WKT geometry strings (POINT(lon lat))
+    3. Geometry column with WKT
+
+    Returns list of {lat, lon} dicts or None if no coordinates found.
+    """
+    coords = []
+    logger.info(f"Extracting coordinates from DataFrame with columns: {list(df.columns)}")
+
+    # Method 1: Check for explicit lat/lon columns
+    lat_cols = [c for c in df.columns if c.lower() in ("lat", "latitude", "y")]
+    lon_cols = [c for c in df.columns if c.lower() in ("lon", "longitude", "x")]
+
+    if lat_cols and lon_cols:
+        for _, row in df.head(max_points).iterrows():
+            try:
+                lat = float(row[lat_cols[0]])
+                lon = float(row[lon_cols[0]])
+                if -90 <= lat <= 90 and -180 <= lon <= 180:
+                    coords.append({"lat": lat, "lon": lon})
+            except (ValueError, TypeError):
+                continue
+        if coords:
+            return coords
+
+    # Method 2: Check for geometry columns with WKT POINT format
+    geom_cols = [c for c in df.columns if c.lower() in ("geometry", "geom", "wkb_geometry", "the_geom", "shape")]
+    logger.info(f"Found geometry columns: {geom_cols}")
+
+    for geom_col in geom_cols:
+        logger.info(f"Checking geometry column '{geom_col}'")
+        # Sample first few values to see what we're working with
+        sample_values = df[geom_col].head(3).tolist()
+        logger.info(f"Sample values from '{geom_col}': {sample_values}")
+        # Also log the type of the first value
+        if len(df) > 0 and df[geom_col].iloc[0] is not None:
+            first_val = df[geom_col].iloc[0]
+            logger.info(f"Type of first value: {type(first_val)}, repr: {repr(first_val)[:200]}")
+
+        for _, row in df.head(max_points).iterrows():
+            geom = row.get(geom_col)
+            if geom:
+                # Convert to string representation for parsing
+                geom_str = str(geom)
+                point = _parse_wkt_point(geom_str)
+                if point:
+                    coords.append(point)
+                elif len(coords) == 0:
+                    # Log first failure to help debugging
+                    logger.debug(f"Could not parse geometry: {geom_str[:100]}")
+        if coords:
+            logger.info(f"Extracted {len(coords)} coordinates from column '{geom_col}'")
+            return coords
+        else:
+            logger.info(f"No coordinates extracted from column '{geom_col}'")
+
+    # Method 3: Check ALL columns for WKT POINT strings
+    for col in df.columns:
+        sample = df[col].head(5).astype(str).tolist()
+        if any("POINT" in str(s).upper() for s in sample):
+            logger.info(f"Found POINT data in column '{col}', extracting coordinates...")
+            for _, row in df.head(max_points).iterrows():
+                val = row.get(col)
+                if val:
+                    point = _parse_wkt_point(str(val))
+                    if point:
+                        coords.append(point)
+            logger.info(f"Extracted {len(coords)} coordinates from column '{col}'")
+            if coords:
+                return coords
+
+    logger.info(f"Total coordinates extracted: {len(coords) if coords else 0}")
+    return coords if coords else None
+
+
+def _parse_wkt_point(wkt: str) -> Optional[Dict[str, float]]:
+    """
+    Parse WKT POINT geometry to extract lat/lon.
+
+    Handles formats:
+    - POINT (lon lat) - WGS84
+    - POINT(lon lat)
+    - POINT Z (lon lat z)
+    - POINT (x y) - UTM/EPSG:25832 (auto-detected and converted)
+    """
+    if not wkt or "POINT" not in wkt.upper():
+        return None
+
+    # Match POINT with optional Z/M modifiers: POINT (lon lat) or POINT Z (lon lat z)
+    match = re.search(r'POINT\s*[ZM]*\s*\(\s*([-\d.]+)\s+([-\d.]+)', wkt, re.IGNORECASE)
+    if not match:
+        logger.debug(f"No POINT match found in: {wkt[:100]}")
+        return None
+
+    try:
+        x = float(match.group(1))
+        y = float(match.group(2))
+
+        # Check if coordinates are in UTM (EPSG:25832) - Munich area values
+        # UTM zone 32N for Munich: x ~ 680000-700000, y ~ 5320000-5350000
+        if x > 100000 and y > 1000000:
+            # Convert from EPSG:25832 (UTM zone 32N) to WGS84
+            lon, lat = _convert_utm_to_wgs84(x, y)
+            if lon is not None and lat is not None:
+                logger.debug(f"UTM ({x}, {y}) -> WGS84 ({lon:.6f}, {lat:.6f})")
+                return {"lat": lat, "lon": lon}
+            else:
+                logger.warning(f"UTM conversion failed for ({x}, {y})")
+        else:
+            # Assume WGS84 coordinates
+            lon, lat = x, y
+            # Sanity check for valid WGS84 coordinates
+            if -180 <= lon <= 180 and -90 <= lat <= 90:
+                return {"lat": lat, "lon": lon}
+    except (ValueError, TypeError):
+        pass
+
+    return None
+
+
+def _convert_utm_to_wgs84(x: float, y: float) -> tuple:
+    """
+    Convert UTM coordinates (EPSG:25832) to WGS84 (EPSG:4326).
+
+    Args:
+        x: Easting in meters
+        y: Northing in meters
+
+    Returns:
+        (longitude, latitude) tuple or (None, None) if conversion fails
+    """
+    try:
+        import pyproj
+
+        # Define coordinate systems
+        utm = pyproj.CRS("EPSG:25832")  # UTM zone 32N
+        wgs84 = pyproj.CRS("EPSG:4326")  # WGS84
+
+        transformer = pyproj.Transformer.from_crs(utm, wgs84, always_xy=True)
+        lon, lat = transformer.transform(x, y)
+
+        # Validate result
+        if -180 <= lon <= 180 and -90 <= lat <= 90:
+            return lon, lat
+    except ImportError:
+        logger.info("pyproj not available, using simplified UTM conversion")
+        # Simplified but accurate enough conversion for Munich area
+        # Based on the UTM zone 32N projection parameters
+        return _simple_utm_to_wgs84(x, y)
+    except Exception as e:
+        logger.warning(f"pyproj conversion failed: {e}, trying fallback")
+        return _simple_utm_to_wgs84(x, y)
+
+    return None, None
+
+
+def _simple_utm_to_wgs84(x: float, y: float) -> tuple:
+    """
+    Simplified UTM to WGS84 conversion for Munich area.
+    Uses linear approximation that's accurate within ~100m for the Munich region.
+    """
+    try:
+        # For Munich area (UTM zone 32N):
+        # Reference point: Munich city center
+        # UTM: 691750, 5334500 -> WGS84: 11.576, 48.137
+
+        # Linear approximation coefficients for Munich area
+        # 1 degree longitude ≈ 73000m at lat 48°
+        # 1 degree latitude ≈ 111000m
+
+        # Reference point (Munich Marienplatz approximate)
+        ref_x = 691750
+        ref_y = 5334500
+        ref_lon = 11.576
+        ref_lat = 48.137
+
+        # Scale factors
+        m_per_deg_lon = 73000  # meters per degree longitude at lat 48
+        m_per_deg_lat = 111000  # meters per degree latitude
+
+        # Calculate offset from reference
+        dx = x - ref_x
+        dy = y - ref_y
+
+        # Convert to degrees
+        lon = ref_lon + (dx / m_per_deg_lon)
+        lat = ref_lat + (dy / m_per_deg_lat)
+
+        # Validate Munich area
+        if 10.5 < lon < 12.5 and 47.5 < lat < 49.0:
+            return lon, lat
+        else:
+            logger.warning(f"Converted coordinates ({lon:.4f}, {lat:.4f}) outside Munich area")
+            return lon, lat  # Return anyway, might be valid
+    except Exception as e:
+        logger.warning(f"Simple UTM conversion failed: {e}")
+
+    return None, None
 
 
 def select_best_resource(resources: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
@@ -113,13 +319,23 @@ def analyze_csv(url: str, user_query: str) -> Dict[str, Any]:
             result_df = preview_df
             sql_query = "SELECT * FROM tab LIMIT 200"
 
-        return {
+        # Extract coordinates if present (CSV might have lat/lon columns)
+        logger.info(f"CSV analysis: extracting coordinates from result with columns {list(result_df.columns)}")
+        coords = _extract_coordinates(result_df)
+        logger.info(f"CSV coordinate extraction result: {len(coords) if coords else 0} coordinates")
+
+        result = {
             "kind": "csv",
             "sql_query": sql_query,
             "preview_markdown": result_df.head(200).to_markdown(index=False),
             "columns": list(result_df.columns),
             "row_count": len(result_df),
         }
+
+        if coords:
+            result["coordinates"] = coords
+
+        return result
 
     finally:
         conn.close()
@@ -130,6 +346,7 @@ def analyze_geospatial(url: str, user_query: str) -> Dict[str, Any]:
     Analyze geospatial data with DuckDB spatial extension.
     Loads GeoJSON/WFS, generates and executes spatial SQL.
     """
+    logger.info(f"analyze_geospatial called with url={url[:80]}...")
     conn = duckdb.connect()
     try:
         # Load extensions
@@ -145,25 +362,26 @@ def analyze_geospatial(url: str, user_query: str) -> Dict[str, Any]:
         # Get preview
         preview_df = conn.execute("SELECT * FROM geo LIMIT 200").fetch_df()
         columns = list(preview_df.columns)
+        logger.info(f"Loaded geospatial data with columns: {columns}")
         preview_md = preview_df.head(20).to_markdown(index=False)
 
         # Generate SQL
         sql_query = generate_sql(user_query, columns, preview_md, "geo", spatial=True)
+        logger.info(f"Generated SQL: {sql_query[:100]}...")
 
         # Execute query
         try:
             result_df = conn.execute(sql_query).fetch_df()
+            logger.info(f"SQL executed, result has {len(result_df)} rows and columns: {list(result_df.columns)}")
         except Exception as e:
             logger.debug(f"Spatial SQL failed, using fallback: {e}")
             result_df = preview_df
             sql_query = "SELECT * FROM geo LIMIT 200"
 
         # Extract coordinates if present
-        coords = None
-        lat_cols = [c for c in result_df.columns if c.lower() in ("lat", "latitude", "y")]
-        lon_cols = [c for c in result_df.columns if c.lower() in ("lon", "longitude", "x")]
-        if lat_cols and lon_cols:
-            coords = result_df[[lat_cols[0], lon_cols[0]]].head(100).to_dict(orient="records")
+        logger.info(f"Calling _extract_coordinates with DataFrame of shape {result_df.shape}")
+        coords = _extract_coordinates(result_df)
+        logger.info(f"_extract_coordinates returned: {len(coords) if coords else 0} coordinates")
 
         result = {
             "kind": "geospatial",

@@ -381,15 +381,20 @@ class IndexCalculator:
 
         with self.db.get_connection() as conn:
             # Get population from Bevölkerungsanteil dataset (has absolute numbers in Basiswert.1)
+            # Use Raumbezug to extract district number since _district_number may not be set
             cursor = conn.execute("""
                 SELECT
-                    json_extract(f.properties, '$._district_number') as district_num,
+                    COALESCE(
+                        json_extract(f.properties, '$._district_number'),
+                        SUBSTR(json_extract(f.properties, '$.Raumbezug'), 1, 2)
+                    ) as district_num,
                     json_extract(f.properties, '$."Basiswert.1"') as population
                 FROM features f
                 JOIN datasets d ON f.dataset_id = d.id
                 WHERE d.title LIKE '%Bevölkerung - Bevölkerungsanteil%'
                 AND json_extract(f.properties, '$.Jahr') = '2024'
                 AND json_extract(f.properties, '$.Ausprägung') = 'insgesamt'
+                AND json_extract(f.properties, '$.Raumbezug') != 'Stadt München'
             """)
 
             for row in cursor.fetchall():
@@ -399,11 +404,15 @@ class IndexCalculator:
                     except (ValueError, TypeError):
                         pass
 
+            logger.info(f"Loaded population data for {len(self._population_cache)} districts, sample: {dict(list(self._population_cache.items())[:3])}")
+
             # Get area from districts table
             cursor = conn.execute("SELECT number, area_sqm FROM districts")
             for row in cursor.fetchall():
                 if row[1]:
                     self._area_cache[row[0]] = row[1] / 1_000_000  # Convert to km²
+
+            logger.info(f"Loaded area data for {len(self._area_cache)} districts, sample: {dict(list(self._area_cache.items())[:3])}")
 
     def _calculate_raw_component(
         self,
