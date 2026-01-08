@@ -716,7 +716,7 @@ class IndexCalculator:
         """Get datasets that can be used in custom indices"""
         with self.db.get_connection() as conn:
             cursor = conn.execute("""
-                SELECT id, title, feature_count, is_district_specific, has_geometry
+                SELECT id, title, feature_count, is_district_specific, has_geometry, description
                 FROM datasets
                 WHERE feature_count > 0
                 ORDER BY
@@ -731,6 +731,7 @@ class IndexCalculator:
                     "feature_count": row[2],
                     "is_district_specific": bool(row[3]),
                     "has_geometry": bool(row[4]),
+                    "description": row[5],
                 }
                 for row in cursor.fetchall()
             ]

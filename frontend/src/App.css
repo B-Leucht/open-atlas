@@ -172,6 +172,10 @@ body {
 }
 
 .dataset-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
   padding: 0.5rem 0.75rem;
   font-size: 0.8125rem;
   cursor: pointer;
@@ -184,6 +188,56 @@ body {
 
 .dataset-option:last-child {
   border-bottom: none;
+}
+
+.dataset-title {
+  flex: 1;
+  font-weight: 500;
+  color: #1a1a1a;
+}
+
+.dataset-info-icon {
+  position: relative;
+  color: #999;
+  font-size: 0.875rem;
+  cursor: help;
+  flex-shrink: 0;
+}
+
+.dataset-info-icon:hover {
+  color: #0066cc;
+}
+
+.dataset-info-icon:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-right: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: #1a1a1a;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 400;
+  line-height: 1.4;
+  white-space: normal;
+  width: 220px;
+  max-height: 150px;
+  overflow-y: auto;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  z-index: 200;
+}
+
+.dataset-info-icon:hover::before {
+  content: '';
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 6px solid transparent;
+  border-left-color: #1a1a1a;
 }
 
 /* Component List */
@@ -362,6 +416,22 @@ body {
 .toggle-group input[type="checkbox"] {
   width: 14px;
   height: 14px;
+}
+
+.edit-index-btn {
+  width: 100%;
+  margin-top: 0.75rem;
+  padding: 0.5rem;
+  background: #fff;
+  border: 1px solid #0066cc;
+  border-radius: 6px;
+  font-size: 0.8125rem;
+  color: #0066cc;
+  cursor: pointer;
+}
+
+.edit-index-btn:hover {
+  background: #f0f7ff;
 }
 
 /* District Detail */

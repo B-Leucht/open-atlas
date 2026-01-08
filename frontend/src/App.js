@@ -18,6 +18,7 @@ const TRANSLATIONS = {
     calculating: 'Calculating...',
     colorOverlay: 'Color overlay',
     dataPoints: 'Data points',
+    editIndex: 'Edit Index',
     close: 'Close',
     normalization: {
       population: '/capita',
@@ -47,6 +48,7 @@ const TRANSLATIONS = {
     calculating: 'Berechne...',
     colorOverlay: 'Farbüberlagerung',
     dataPoints: 'Datenpunkte',
+    editIndex: 'Index bearbeiten',
     close: 'Schließen',
     normalization: {
       population: '/Einw.',
@@ -376,6 +378,33 @@ function App() {
     ));
   };
 
+  const editCurrentIndex = async () => {
+    if (!indexResult || !indexResult.components) return;
+
+    const newComponents = [];
+    for (const comp of indexResult.components) {
+      // Find the dataset in availableDatasets
+      const dataset = availableDatasets.find(d => d.id === comp.dataset_id);
+      if (dataset) {
+        const columns = await loadDatasetColumns(dataset.id);
+        newComponents.push({
+          dataset,
+          columns,
+          column: comp.column || null,
+          weight: comp.weight,
+          normalize: comp.normalize || 'minmax',
+          aggregation: comp.aggregation || 'count',
+          label: comp.label || dataset.title.substring(0, 40)
+        });
+      }
+    }
+
+    if (newComponents.length > 0) {
+      setCustomComponents(newComponents);
+      setShowCustomBuilder(true);
+    }
+  };
+
   const filteredDatasets = availableDatasets.filter(d =>
     d.title.toLowerCase().includes(datasetSearch.toLowerCase()) &&
     !customComponents.find(c => c.dataset.id === d.id)
@@ -432,7 +461,10 @@ function App() {
                 <div className="dataset-dropdown">
                   {filteredDatasets.map(d => (
                     <div key={d.id} className="dataset-option" onClick={() => addComponent(d)}>
-                      {d.title}
+                      <span className="dataset-title">{d.title}</span>
+                      {d.description && (
+                        <span className="dataset-info-icon" data-tooltip={d.description}>ⓘ</span>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -541,6 +573,12 @@ function App() {
                 {t.dataPoints}
               </label>
             </div>
+
+            {indexResult.components && indexResult.components.length > 0 && (
+              <button className="edit-index-btn" onClick={editCurrentIndex}>
+                {t.editIndex}
+              </button>
+            )}
           </div>
         )}
 
