@@ -1,0 +1,1435 @@
+<!DOCTYPE html>
+<!-- saved from url=(0081)https://docs.fitko.de/govdata/docs/developer/spec-ckan/#get-/action/resource_show -->
+<html lang="de" dir="ltr" class="docs-wrapper plugin-docs plugin-id-default docs-version-current docs-doc-page docs-doc-id-developer/spec-ckan" data-has-hydrated="true" data-rh="lang,dir,class,data-has-hydrated"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<meta name="generator" content="Docusaurus v3.8.1">
+<title>CKAN-Spezifikation | GovData Dokumentation</title><meta data-rh="true" name="twitter:card" content="summary_large_image"><meta data-rh="true" property="og:locale" content="de"><meta data-rh="true" name="docusaurus_locale" content="de"><meta data-rh="true" name="docsearch:language" content="de"><meta data-rh="true" name="docusaurus_version" content="current"><meta data-rh="true" name="docusaurus_tag" content="docs-default-current"><meta data-rh="true" name="docsearch:version" content="current"><meta data-rh="true" name="docsearch:docusaurus_tag" content="docs-default-current"><meta data-rh="true" property="og:title" content="CKAN-Spezifikation | GovData Dokumentation"><meta data-rh="true" name="description" content="Für das Datenmanagement bei GovData wird ein CKAN-System eingesetzt."><meta data-rh="true" property="og:description" content="Für das Datenmanagement bei GovData wird ein CKAN-System eingesetzt."><link data-rh="true" rel="icon" href="https://docs.fitko.de/govdata/favicon.png"><script src="./CKAN-Spezifikation _ GovData Dokumentation_files/script.js" defer="defer" data-domain="docs.fitko.de"></script><link rel="stylesheet" href="./CKAN-Spezifikation _ GovData Dokumentation_files/styles.bf38ec67.css">
+<script src="./CKAN-Spezifikation _ GovData Dokumentation_files/runtime~main.bdc534ad.js" defer="defer"></script>
+<script src="./CKAN-Spezifikation _ GovData Dokumentation_files/main.22469e58.js" defer="defer"></script>
+<link rel="canonical" href="https://docs.fitko.de/govdata/docs/developer/spec-ckan/" data-rh="true"><link rel="alternate" href="https://docs.fitko.de/govdata/docs/developer/spec-ckan/" hreflang="de" data-rh="true"><link rel="alternate" href="https://docs.fitko.de/govdata/docs/developer/spec-ckan/" hreflang="x-default" data-rh="true"><meta name="viewport" content="width=device-width, initial-scale=1.0" data-rh="true"><meta property="og:url" content="https://docs.fitko.de/govdata/docs/developer/spec-ckan/" data-rh="true"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5e95c892.7989e72b.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/aba21aa0.fb0dddec.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a7bd4aaa.445250a0.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5113a121.dab2c735.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a94703ab.bdb4e958.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/17896441.79049710.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/c377a04b.2b610271.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5e95c892.7989e72b.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/aba21aa0.fb0dddec.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a7bd4aaa.445250a0.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5113a121.dab2c735.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a94703ab.bdb4e958.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/17896441.79049710.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/c377a04b.2b610271.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5e95c892.7989e72b.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/aba21aa0.fb0dddec.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a7bd4aaa.445250a0.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5113a121.dab2c735.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a94703ab.bdb4e958.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/17896441.79049710.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/c377a04b.2b610271.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/17896441.79049710.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/10645a48.e4cb2b4f.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5e95c892.7989e72b.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/aba21aa0.fb0dddec.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a7bd4aaa.445250a0.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5113a121.dab2c735.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a94703ab.bdb4e958.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/17896441.79049710.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/c377a04b.2b610271.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5e95c892.7989e72b.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/aba21aa0.fb0dddec.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a7bd4aaa.445250a0.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5113a121.dab2c735.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a94703ab.bdb4e958.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/17896441.79049710.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/c377a04b.2b610271.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5e95c892.7989e72b.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/aba21aa0.fb0dddec.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a7bd4aaa.445250a0.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5113a121.dab2c735.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a94703ab.bdb4e958.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/17896441.79049710.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/c377a04b.2b610271.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/17896441.79049710.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/e747ec83.a776a1ca.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5e95c892.7989e72b.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/aba21aa0.fb0dddec.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a7bd4aaa.445250a0.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5113a121.dab2c735.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a94703ab.bdb4e958.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/17896441.79049710.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/c377a04b.2b610271.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5e95c892.7989e72b.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/aba21aa0.fb0dddec.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a7bd4aaa.445250a0.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5113a121.dab2c735.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a94703ab.bdb4e958.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/17896441.79049710.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/c377a04b.2b610271.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5e95c892.7989e72b.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/aba21aa0.fb0dddec.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a7bd4aaa.445250a0.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5113a121.dab2c735.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a94703ab.bdb4e958.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/17896441.79049710.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/c377a04b.2b610271.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5e95c892.7989e72b.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/aba21aa0.fb0dddec.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a7bd4aaa.445250a0.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5113a121.dab2c735.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a94703ab.bdb4e958.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/17896441.79049710.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/c377a04b.2b610271.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5e95c892.7989e72b.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/aba21aa0.fb0dddec.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a7bd4aaa.445250a0.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5113a121.dab2c735.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a94703ab.bdb4e958.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/17896441.79049710.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/c377a04b.2b610271.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5e95c892.7989e72b.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/aba21aa0.fb0dddec.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a7bd4aaa.445250a0.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5113a121.dab2c735.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a94703ab.bdb4e958.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/17896441.79049710.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/c377a04b.2b610271.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5e95c892.7989e72b.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/aba21aa0.fb0dddec.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a7bd4aaa.445250a0.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5113a121.dab2c735.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a94703ab.bdb4e958.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/17896441.79049710.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/c377a04b.2b610271.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/17896441.79049710.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/9ff0db8e.14d549a8.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5e95c892.7989e72b.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/aba21aa0.fb0dddec.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a7bd4aaa.445250a0.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5113a121.dab2c735.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a94703ab.bdb4e958.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/17896441.79049710.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/c377a04b.2b610271.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5e95c892.7989e72b.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/aba21aa0.fb0dddec.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a7bd4aaa.445250a0.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5113a121.dab2c735.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a94703ab.bdb4e958.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/17896441.79049710.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/c377a04b.2b610271.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5e95c892.7989e72b.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/aba21aa0.fb0dddec.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a7bd4aaa.445250a0.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5113a121.dab2c735.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a94703ab.bdb4e958.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/17896441.79049710.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/c377a04b.2b610271.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/17896441.79049710.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/1a2c22fd.e1d77449.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/1f391b9e.3af80545.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a7456010.ee784d9d.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/e7ce6630.e570cdd6.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5e95c892.7989e72b.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/aba21aa0.fb0dddec.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a7bd4aaa.445250a0.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5113a121.dab2c735.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a94703ab.bdb4e958.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/17896441.79049710.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/c377a04b.2b610271.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5e95c892.7989e72b.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/aba21aa0.fb0dddec.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a7bd4aaa.445250a0.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5113a121.dab2c735.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a94703ab.bdb4e958.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/17896441.79049710.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/c377a04b.2b610271.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5e95c892.7989e72b.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/aba21aa0.fb0dddec.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a7bd4aaa.445250a0.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5113a121.dab2c735.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a94703ab.bdb4e958.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/17896441.79049710.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/c377a04b.2b610271.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/17896441.79049710.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/9897d22d.3050399c.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5e95c892.7989e72b.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/aba21aa0.fb0dddec.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a7bd4aaa.445250a0.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5113a121.dab2c735.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a94703ab.bdb4e958.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/17896441.79049710.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/c377a04b.2b610271.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5e95c892.7989e72b.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/aba21aa0.fb0dddec.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a7bd4aaa.445250a0.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5113a121.dab2c735.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a94703ab.bdb4e958.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/17896441.79049710.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/c377a04b.2b610271.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5e95c892.7989e72b.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/aba21aa0.fb0dddec.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a7bd4aaa.445250a0.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5113a121.dab2c735.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a94703ab.bdb4e958.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/17896441.79049710.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/c377a04b.2b610271.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/17896441.79049710.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/155691f0.f144000e.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5e95c892.7989e72b.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/aba21aa0.fb0dddec.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a7bd4aaa.445250a0.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5113a121.dab2c735.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a94703ab.bdb4e958.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/17896441.79049710.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/c377a04b.2b610271.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5e95c892.7989e72b.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/aba21aa0.fb0dddec.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a7bd4aaa.445250a0.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5113a121.dab2c735.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a94703ab.bdb4e958.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/17896441.79049710.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/c377a04b.2b610271.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5e95c892.7989e72b.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/aba21aa0.fb0dddec.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a7bd4aaa.445250a0.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5113a121.dab2c735.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a94703ab.bdb4e958.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/17896441.79049710.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/c377a04b.2b610271.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/17896441.79049710.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/af9c7aa4.2961f927.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5e95c892.7989e72b.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/aba21aa0.fb0dddec.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a7bd4aaa.445250a0.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5113a121.dab2c735.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a94703ab.bdb4e958.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/17896441.79049710.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/c377a04b.2b610271.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5e95c892.7989e72b.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/aba21aa0.fb0dddec.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a7bd4aaa.445250a0.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5113a121.dab2c735.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a94703ab.bdb4e958.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/17896441.79049710.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/c377a04b.2b610271.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5e95c892.7989e72b.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/aba21aa0.fb0dddec.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a7bd4aaa.445250a0.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5113a121.dab2c735.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a94703ab.bdb4e958.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/17896441.79049710.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/c377a04b.2b610271.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/17896441.79049710.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/b5e9cae4.8586aa3f.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5e95c892.7989e72b.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/aba21aa0.fb0dddec.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a7bd4aaa.445250a0.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5113a121.dab2c735.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a94703ab.bdb4e958.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/17896441.79049710.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/c377a04b.2b610271.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5e95c892.7989e72b.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/aba21aa0.fb0dddec.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a7bd4aaa.445250a0.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5113a121.dab2c735.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a94703ab.bdb4e958.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/17896441.79049710.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/c377a04b.2b610271.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5e95c892.7989e72b.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/aba21aa0.fb0dddec.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a7bd4aaa.445250a0.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/5113a121.dab2c735.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a94703ab.bdb4e958.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/17896441.79049710.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/c377a04b.2b610271.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/17896441.79049710.js"><link rel="prefetch" href="https://docs.fitko.de/govdata/assets/js/a01f3eaa.6ad6c8ce.js"></head>
+<body class="" data-theme="light" style="overflow: visible;" data-rh="class,data-theme">
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;"><defs>
+<symbol id="theme-svg-external-link" viewBox="0 0 24 24"><path fill="currentColor" d="M21 13v10h-21v-19h12v2h-10v15h17v-8h2zm3-12h-10.988l4.035 4-6.977 7.07 2.828 2.828 6.977-7.07 4.125 4.172v-11z"></path></symbol>
+</defs></svg>
+<script>!function(){var t="light";var e=function(){try{return new URLSearchParams(window.location.search).get("docusaurus-theme")}catch(t){}}()||function(){try{return window.localStorage.getItem("theme")}catch(t){}}();document.documentElement.setAttribute("data-theme",e||t),document.documentElement.setAttribute("data-theme-choice",e||t)}(),function(){try{const c=new URLSearchParams(window.location.search).entries();for(var[t,e]of c)if(t.startsWith("docusaurus-data-")){var a=t.replace("docusaurus-data-","data-");document.documentElement.setAttribute(a,e)}}catch(t){}}()</script><div id="__docusaurus"><div class="portal-header"><div class="sm:block xl:block hidden xl:hidden sm:hidden"></div><div class="sm:hidden pb-2"><div class="bg-gray-100 text-black p-2 shadow shadow-gray-500/50 flex flex-row justify-end"><button type="button" title="Menü anzeigen" tabindex="0" id="req-open"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="cursor-pointer" aria-hidden="true"><path d="M4 6l16 0"></path><path d="M4 12l16 0"></path><path d="M4 18l16 0"></path></svg></button></div></div><div class="hidden sm:block pb-2 sm:pb-4"><div class="absolute top-0 left-0 right-0 z-99 tracking-wide"><nav class="bg-gray-100 text-gray-700 px-8 gap-8 shadow shadow-gray-500/50 flex flex-row justify-between text-xs underline-offset-2 uppercase"><div class="flex gap-4 items-center"><a href="https://docs.fitko.de/" class="hover:underline p-1 flex" title="Home"><svg xmlns="http://www.w3.org/2000/svg" height="1em" viewBox="0 0 576 512" aria-hidden="true" class="h-3.5 pt-0.5"><path d="M575.8 255.5c0 18-15 32.1-32 32.1h-32l.7 160.2c0 2.7-.2 5.4-.5 8.1V472c0 22.1-17.9 40-40 40h-16c-1.1 0-2.2 0-3.3-.1-1.4.1-2.8.1-4.2.1H392c-22.1 0-40-17.9-40-40v-88c0-17.7-14.3-32-32-32h-64c-17.7 0-32 14.3-32 32v88c0 22.1-17.9 40-40 40h-55.9c-1.5 0-3-.1-4.5-.2-1.2.1-2.4.2-3.6.2h-16c-22.1 0-40-17.9-40-40V360c0-.9 0-1.9.1-2.8v-69.6H32c-18 0-32-14-32-32.1 0-9 3-17 10-24L266.4 8c7-7 15-8 22-8s15 2 21 7l255.4 224.5c8 7 12 15 11 24z"></path></svg></a><a href="https://docs.fitko.de/" class="h-3.5 hover:underline px-2">Zurück zum Entwicklungsportal</a></div><div class="flex gap-4 items-center"><a href="https://gitlab.opencode.de/fitko/govdata/docs" target="_blank" rel="noopener noreferrer" class="h-3.5 hover:underline">Quellcode</a><a href="https://gitlab.opencode.de/fitko/govdata/docs/-/issues" class="h-3.5 hover:underline flex items-center"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-3.5 mr-1" aria-hidden="true"><path d="M4 5h2"></path><path d="M5 4v2"></path><path d="M11.5 4l-.5 2"></path><path d="M18 5h2"></path><path d="M19 4v2"></path><path d="M15 9l-1 1"></path><path d="M18 13l2 -.5"></path><path d="M18 19h2"></path><path d="M19 18v2"></path><path d="M14 16.518l-6.518 -6.518l-4.39 9.58a1 1 0 0 0 1.329 1.329l9.579 -4.39z"></path></svg>Feedback</a></div></nav></div><hr class="h-px" aria-hidden="true"></div></div><main class="sm:py-1"><div role="region" aria-label="Zum Hauptinhalt springen"><a class="skipToContent_fXgn" href="https://docs.fitko.de/govdata/docs/developer/spec-ckan/#__docusaurus_skipToContent_fallback">Zum Hauptinhalt springen</a></div><nav aria-label="Main" class="theme-layout-navbar navbar navbar--fixed-top"><div class="navbar__inner"><div class="theme-layout-navbar-left navbar__items"><a class="navbar__brand" href="https://docs.fitko.de/govdata/"><b class="navbar__title text--truncate">GovData Dokumentation</b></a></div><div class="theme-layout-navbar-right navbar__items navbar__items--right"><div class="navbarSearchContainer_Bca1"><div class="dsla-search-wrapper"><div class="dsla-search-field" data-tags="default,docs-default-current"><div class="aa-Autocomplete" role="combobox" aria-expanded="false" aria-haspopup="listbox" aria-labelledby="autocomplete-0-label"><button type="button" class="aa-DetachedSearchButton" title="Search" id="autocomplete-0-label"><div class="aa-DetachedSearchButtonIcon" aria-label="Search"><svg class="aa-SubmitIcon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M16.041 15.856c-0.034 0.026-0.067 0.055-0.099 0.087s-0.060 0.064-0.087 0.099c-1.258 1.213-2.969 1.958-4.855 1.958-1.933 0-3.682-0.782-4.95-2.050s-2.050-3.017-2.050-4.95 0.782-3.682 2.050-4.95 3.017-2.050 4.95-2.050 3.682 0.782 4.95 2.050 2.050 3.017 2.050 4.95c0 1.886-0.745 3.597-1.959 4.856zM21.707 20.293l-3.675-3.675c1.231-1.54 1.968-3.493 1.968-5.618 0-2.485-1.008-4.736-2.636-6.364s-3.879-2.636-6.364-2.636-4.736 1.008-6.364 2.636-2.636 3.879-2.636 6.364 1.008 4.736 2.636 6.364 3.879 2.636 6.364 2.636c2.125 0 4.078-0.737 5.618-1.968l3.675 3.675c0.391 0.391 1.024 0.391 1.414 0s0.391-1.024 0-1.414z"></path></svg></div><div class="aa-DetachedSearchButtonPlaceholder">Suchen...</div><div class="aa-DetachedSearchButtonQuery"></div></button></div></div></div></div></div></div><div role="presentation" class="navbar-sidebar__backdrop"></div></nav><div id="__docusaurus_skipToContent_fallback" class="theme-layout-main main-wrapper mainWrapper_z2l0"><div class="docsWrapper_hBAB"><button aria-label="Zurück nach oben scrollen" class="clean-btn theme-back-to-top-button backToTopButton_sjWU" type="button"></button><div class="docRoot_UBD9"><aside class="theme-doc-sidebar-container docSidebarContainer_YfHR"><div class="sidebarViewport_aRkj"><div class="sidebar_njMd"><nav aria-label="Docs sidebar" class="menu thin-scrollbar menu_SIkG"><ul class="theme-doc-sidebar-menu menu__list"><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-1 menu__list-item"><a class="menu__link" href="https://docs.fitko.de/govdata/docs/">Überblick</a></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item menu__list-item--collapsed"><div class="menu__list-item-collapsible"><a class="menu__link menu__link--sublist" href="https://docs.fitko.de/govdata/docs/library/introduction">Bibliothek</a><button aria-label="Expand sidebar category &#39;Bibliothek&#39;" aria-expanded="false" type="button" class="clean-btn menu__caret"></button></div></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item"><div class="menu__list-item-collapsible"><a class="menu__link menu__link--sublist menu__link--active" href="https://docs.fitko.de/govdata/docs/developer/introduction">Entwickelnde</a><button aria-label="Collapse sidebar category &#39;Entwickelnde&#39;" aria-expanded="true" type="button" class="clean-btn menu__caret"></button></div><ul class="menu__list" style="display: block; overflow: visible; height: auto;"><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link menu__link--active" aria-current="page" tabindex="0" href="https://docs.fitko.de/govdata/docs/developer/spec-ckan">CKAN-Spezifikation</a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="https://docs.fitko.de/govdata/docs/developer/sparql-editor">SPARQL-Editor</a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-2 menu__list-item"><a class="menu__link" tabindex="0" href="https://docs.fitko.de/govdata/docs/developer/spec-catalog">Catalog-Spezifikation</a></li></ul></li><li class="theme-doc-sidebar-item-category theme-doc-sidebar-item-category-level-1 menu__list-item menu__list-item--collapsed"><div class="menu__list-item-collapsible"><a class="menu__link menu__link--sublist" href="https://docs.fitko.de/govdata/docs/dataprovider/introduction">Datenbereitstellende</a><button aria-label="Expand sidebar category &#39;Datenbereitstellende&#39;" aria-expanded="false" type="button" class="clean-btn menu__caret"></button></div></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-1 menu__list-item"><a class="menu__link" href="https://docs.fitko.de/govdata/docs/mermaid">Mermaid Beispiele</a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-1 menu__list-item"><a class="menu__link" href="https://docs.fitko.de/govdata/docs/glossary">Glossar</a></li><li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-1 menu__list-item"><a class="menu__link" href="https://docs.fitko.de/govdata/docs/roadmap">Roadmap</a></li></ul></nav><button type="button" title="Seitenleiste einklappen" aria-label="Seitenleiste einklappen" class="button button--secondary button--outline collapseSidebarButton_PEFL"><svg width="20" height="20" aria-hidden="true" class="collapseSidebarButtonIcon_kv0_"><g fill="#7a7a7a"><path d="M9.992 10.023c0 .2-.062.399-.172.547l-4.996 7.492a.982.982 0 01-.828.454H1c-.55 0-1-.453-1-1 0-.2.059-.403.168-.551l4.629-6.942L.168 3.078A.939.939 0 010 2.528c0-.548.45-.997 1-.997h2.996c.352 0 .649.18.828.45L9.82 9.472c.11.148.172.347.172.55zm0 0"></path><path d="M19.98 10.023c0 .2-.058.399-.168.547l-4.996 7.492a.987.987 0 01-.828.454h-3c-.547 0-.996-.453-.996-1 0-.2.059-.403.168-.551l4.625-6.942-4.625-6.945a.939.939 0 01-.168-.55 1 1 0 01.996-.997h3c.348 0 .649.18.828.45l4.996 7.492c.11.148.168.347.168.55zm0 0"></path></g></svg></button></div></div></aside><main class="docMainContainer_TBSr"><div class="container padding-top--md padding-bottom--lg"><div class="row"><div class="col"><div class="docItemContainer_Djhp"><article><div class="theme-doc-markdown markdown"><header><h1>CKAN-Spezifikation</h1></header><p>Für das Datenmanagement bei GovData wird ein CKAN-System eingesetzt.
+Über die CKAN-API können die Metadaten abgerufen werden.
+Folgend wird die Spezifikation als OpenAPI bereitgestellt (die Ursprungsversion hat data.gv.at erarbeitet).
+Ihr könnt alle Endpunkte direkt auf dieser Seite ausprobieren.</p>
+<div>Die aktuelle Version kann&nbsp;<a href="https://docs.fitko.de/govdata/spec/ckan-govdata.yaml" download="">hier</a>&nbsp;im OpenAPI Format heruntergeladen werden.<rapi-doc render-style="view" layout="column" spec-url="/govdata/spec/ckan-govdata.yaml" theme="light" schema-description-expanded="true" show-info="false" show-header="false" show-components="false" allow-spec-file-load="false" info-description-headings-in-navbar="false" allow-try="true" primary-color="#11171a" allow-server-selection="false" server-url=""><template shadowrootmode="open"><!---->
+    <!--?lit$986794476$-->
+  <style>
+  *, *:before, *:after { box-sizing: border-box; }
+  
+  :host {
+    /* Common Styles - irrespective of themes */  
+    --border-radius: 2px;
+    --layout: <!---->column;
+    --font-mono: <!---->Monaco, "Andale Mono", "Roboto Mono", Consolas, monospace;
+    --font-regular: <!---->"Open Sans", Avenir, "Segoe UI", Arial, sans-serif;
+    --scroll-bar-width: 8px;
+    --nav-item-padding: <!---->7px 16px 7px 10px;
+    
+    --resp-area-height: <!---->400px;
+    --font-size-small: <!---->12px;
+    --font-size-mono: <!---->13px;
+    --font-size-regular: <!---->14px;
+    --dialog-z-index: 1000;
+
+    --focus-shadow: 0 0 0 1px transparent, 0 0 0 3px <!---->rgba(17, 23, 26, 0.4);
+
+    /* Theme specific styles */  
+    --bg:<!---->#fafbfc;
+    --bg2:<!---->#f5f6f7;
+    --bg3:<!---->#ebeced;
+    --light-bg:<!---->#cdcecf;
+    --fg:<!---->#444444;
+    --fg2:<!---->#555555;
+    --fg3:<!---->#626262;
+    --light-fg:<!---->#8a8a8a;
+    --selection-bg:<!---->#555555;
+    --selection-fg:<!---->#f5f6f7;
+    --overlay-bg:<!---->rgba(0, 0, 0, 0.4);
+    
+    /* Border Colors */
+    --border-color:<!---->#d4d5d6;
+    --light-border-color:<!---->#e3e4e5;
+    --code-border-color:<!---->transparent;
+
+    --input-bg:<!---->#ffffff;
+    --placeholder-color:<!---->#9e9e9e;
+    --hover-color:<!---->#f5f6f7;
+    --red:<!---->#F06560;
+    --light-red:<!---->#fff0f0;
+    --pink:<!---->#990055;
+    --light-pink:<!---->#ffb2b2;
+    --green:<!---->#690;
+    --light-green:<!---->#fbfff0;
+    --blue:<!---->#47AFE8;
+    --light-blue:<!---->#eff8fd;
+    --orange:<!---->#FF9900;
+    --light-orange:<!---->#fff5e6;
+    --yellow:<!---->#827717;
+    --light-yellow:<!---->#fff5cc;
+    --purple:<!---->#786FF1;
+    --brown:<!---->#D4AC0D;
+
+    /* Header Color */
+    --header-bg:<!---->#464748;
+    --header-fg:<!---->#fff;
+    --header-color-darker:<!---->#323334;
+    --header-color-border:<!---->#505152;
+
+    /* Nav Colors */  
+    --nav-bg-color:<!---->#323334;
+    --nav-text-color:<!---->rgba(255, 255, 255, 0.65);
+    --nav-hover-bg-color:<!---->#232425;
+    --nav-hover-text-color:<!---->#fff;
+    --nav-accent-color:<!---->#2a3033;
+    --nav-accent-text-color:<!---->#fff;
+
+    /* Nav API Method Colors*/
+    --nav-get-color:<!---->#47AFE8;
+    --nav-put-color:<!---->#FF9900;
+    --nav-post-color:<!---->#690;
+    --nav-delete-color:<!---->#F06560;
+    --nav-head-color:<!---->#827717;
+
+    /* Primary Colors */  
+    --primary-color:<!---->#11171a;
+    --primary-color-invert:<!---->#fff;
+    --primary-color-trans:<!---->rgba(17, 23, 26, 0.4);
+
+    /*Code Syntax Color*/
+    --code-bg:<!---->rgba(235, 236, 237, 0.7);
+    --code-fg:<!---->#666;
+    --inline-code-fg:<!---->brown;
+    --code-property-color:<!---->#905;
+    --code-keyword-color:<!---->#07a;
+    --code-operator-color:<!---->#9a6e3a;
+  }
+  <!----></style>
+
+    <!-- Header -->
+    <!--?lit$986794476$-->
+    
+    <!-- Advanced Search -->
+    <!--?lit$986794476$-->
+    <dialog-box heading="Search" show="false"><template shadowrootmode="open"><!---->
+    <!--?lit$986794476$--><!--?--></template>
+      <span class="advanced-search-options">
+        <input id="input-advanced-search-dialog" style="width:100%; padding-right:20px;" type="text" part="textbox textbox-search-dialog" placeholder="search text..." spellcheck="false">
+        <div style="display:flex; margin:8px 0 24px;">
+          <div>
+            <input style="cursor:pointer;" type="checkbox" part="checkbox checkbox-search-dialog" id="search-api-path" checked="">
+            <label for="search-api-path" style="cursor:pointer;"> API Path </label>
+            </div>
+          <div style="margin-left: 16px;">
+            <input style="cursor:pointer;" type="checkbox" part="checkbox checkbox-search-dialog" id="search-api-descr" checked="">
+            <label style="cursor:pointer;" for="search-api-descr"> API Description </label>
+          </div>
+          <div style="margin-left: 16px;">
+            <input style="cursor:pointer;" type="checkbox" part="checkbox checkbox-search-dialog" id="search-api-params">
+            <label style="cursor:pointer;" for="search-api-params"> API Parameters </label>
+          </div>
+          <div style="margin-left: 16px;">
+            <input style="cursor:pointer;" type="checkbox" part="checkbox checkbox-search-dialog" id="search-api-request-body">
+            <label style="cursor:pointer;" for="search-api-request-body"> Request Body Parameters </label>
+          </div>
+          <div style="margin-left: 16px;">
+            <input style="cursor:pointer;" type="checkbox" part="checkbox checkbox-search-dialog" id="search-api-resp-descr">
+            <label style="cursor:pointer;" for="search-api-resp-descr"> Response Description </label>
+          </div>
+        </div>
+      </span>
+      
+      <!--?lit$986794476$-->
+    </dialog-box>
+  
+
+    <div id="the-main-body" class="body " dir="">
+      <!-- Side Nav -->
+      <!--?lit$986794476$-->
+
+      <!-- Main Content -->
+      <main class="main-content regular-font" tabindex="-1" part="section-main-content">
+        <slot></slot>
+        <div class="main-content-inner--view-mode">
+          <!--?lit$986794476$-->
+              <!--?lit$986794476$-->
+                  <div class="operations-root">
+                  <!--?lit$986794476$-->
+                      <!--?lit$986794476$-->
+                      <!--?lit$986794476$-->
+                      <!--?lit$986794476$-->
+  <section id="auth" part="section-auth" style="text-align:left; direction:ltr; margin-top:24px; margin-bottom:24px;" class="observe-me section-gap ">
+    <div class="sub-title regular-font"> AUTHENTICATION </div>
+
+    <div class="small-font-size" style="display:flex; align-items: center; min-height:30px">
+      <!--?lit$986794476$--><div class="red-text">No API key applied</div>
+    </div>
+    <!--?lit$986794476$-->
+        <table role="presentation" id="auth-table" class="m-table padded-12" style="width:100%;">
+          <!--?lit$986794476$--><!---->
+            <tr id="security-scheme-ckanapikey" class="apikey">
+              <td style="max-width:500px; overflow-wrap: break-word;">
+                <div style="line-height:28px; margin-bottom:5px;">
+                  <span style="font-weight:bold; font-size:var(--font-size-regular)"><!--?lit$986794476$-->API Key (Authorization)</span>
+                  <!--?lit$986794476$-->
+                </div>
+                <!--?lit$986794476$-->
+
+                <!--?lit$986794476$-->
+                    <div style="margin-bottom:5px">
+                      <!--?lit$986794476$-->Send <code><!--?lit$986794476$-->Authorization</code> in <code><!--?lit$986794476$-->header</code>
+                    </div>
+                    <div style="max-height:28px;">
+                      <!--?lit$986794476$-->
+                          <input type="text" placeholder="api-token" spellcheck="false" value="" class="apiKey ckanapikey api-key-input" id="apiKey-ckanapikey-api-key-input">
+                          <button class="m-btn thin-border" style="margin-left:5px;" part="btn btn-outline">
+                            <!--?lit$986794476$-->SET
+                          </button>
+                    </div>
+                <!--?lit$986794476$-->
+              </td>
+            </tr>
+            <!--?lit$986794476$-->
+          <!---->
+        </table>
+    <slot name="auth"></slot>
+  </section>
+
+                      <div id="operations-top" class="observe-me">
+                        <slot name="operations-top"></slot>
+                      </div>  
+                      <!--?lit$986794476$-->
+    <!--?lit$986794476$-->
+        <div style="display:flex; justify-content:flex-end;"> 
+          <span style="color:var(--primary-color); cursor:pointer;">
+            Expand all
+          </span> 
+          &nbsp;|&nbsp; 
+          <span style="color:var(--primary-color); cursor:pointer;">
+            Collapse all
+          </span> 
+          &nbsp; sections
+        </div>
+    <!--?lit$986794476$--><!---->
+      <!--?lit$986794476$--> 
+          <div class="regular-font section-gap section-tag expanded"> 
+            <div class="section-tag-header">
+              <div class="sub-title tag" style="color:var(--primary-color)" id="tag--datasets"><!--?lit$986794476$-->datasets</div>
+            </div>
+            <div class="section-tag-body">
+              <slot name="tag--datasets"></slot>
+              <div class="regular-font regular-font-size m-markdown" style="padding-bottom:12px">
+                <!--?lit$986794476$--><p>datasets</p>
+
+              </div>
+              <!--?lit$986794476$--><!---->
+                <section part="section-endpoint" id="get-/action/package_list" class="m-endpoint regular-font get collapsed">
+                  <!--?lit$986794476$-->
+  <summary part="section-endpoint-head-collapsed" class="endpoint-head get  collapsed">
+    <div part="section-endpoint-head-method" class="method get "> <!--?lit$986794476$-->get </div> 
+    <div part="section-endpoint-head-path" class="path "> 
+      <!--?lit$986794476$-->/action/package_list 
+      <!--?lit$986794476$-->
+    </div>
+    <!--?lit$986794476$-->
+    <!--?lit$986794476$-->
+        <div class="only-large-screen" style="min-width:60px; flex:1"></div>
+        <div part="section-endpoint-head-description" class="descr"><!--?lit$986794476$-->List all datasets within given limit </div>
+  </summary>
+        
+                  <!--?lit$986794476$-->
+                </section><!----><!---->
+                <section part="section-endpoint" id="get-/action/package_search" class="m-endpoint regular-font get collapsed">
+                  <!--?lit$986794476$-->
+  <summary part="section-endpoint-head-collapsed" class="endpoint-head get  collapsed">
+    <div part="section-endpoint-head-method" class="method get "> <!--?lit$986794476$-->get </div> 
+    <div part="section-endpoint-head-path" class="path "> 
+      <!--?lit$986794476$-->/action/package_search 
+      <!--?lit$986794476$-->
+    </div>
+    <!--?lit$986794476$-->
+    <!--?lit$986794476$-->
+        <div class="only-large-screen" style="min-width:60px; flex:1"></div>
+        <div part="section-endpoint-head-description" class="descr"><!--?lit$986794476$-->Search among all datasets </div>
+  </summary>
+        
+                  <!--?lit$986794476$-->
+                </section><!----><!---->
+                <section part="section-endpoint" id="get-/action/package_show" class="m-endpoint regular-font get collapsed">
+                  <!--?lit$986794476$-->
+  <summary part="section-endpoint-head-collapsed" class="endpoint-head get  collapsed">
+    <div part="section-endpoint-head-method" class="method get "> <!--?lit$986794476$-->get </div> 
+    <div part="section-endpoint-head-path" class="path "> 
+      <!--?lit$986794476$-->/action/package_show 
+      <!--?lit$986794476$-->
+    </div>
+    <!--?lit$986794476$-->
+    <!--?lit$986794476$-->
+        <div class="only-large-screen" style="min-width:60px; flex:1"></div>
+        <div part="section-endpoint-head-description" class="descr"><!--?lit$986794476$-->Get details of one package </div>
+  </summary>
+        
+                  <!--?lit$986794476$-->
+                </section><!----><!---->
+                <section part="section-endpoint" id="get-/action/organization_list" class="m-endpoint regular-font get collapsed">
+                  <!--?lit$986794476$-->
+  <summary part="section-endpoint-head-collapsed" class="endpoint-head get  collapsed">
+    <div part="section-endpoint-head-method" class="method get "> <!--?lit$986794476$-->get </div> 
+    <div part="section-endpoint-head-path" class="path "> 
+      <!--?lit$986794476$-->/action/organization_list 
+      <!--?lit$986794476$-->
+    </div>
+    <!--?lit$986794476$-->
+    <!--?lit$986794476$-->
+        <div class="only-large-screen" style="min-width:60px; flex:1"></div>
+        <div part="section-endpoint-head-description" class="descr"><!--?lit$986794476$-->List all groups within given parameters </div>
+  </summary>
+        
+                  <!--?lit$986794476$-->
+                </section><!----><!---->
+                <section part="section-endpoint" id="get-/action/current_package_list_with_resources" class="m-endpoint regular-font get collapsed">
+                  <!--?lit$986794476$-->
+  <summary part="section-endpoint-head-collapsed" class="endpoint-head get  collapsed">
+    <div part="section-endpoint-head-method" class="method get "> <!--?lit$986794476$-->get </div> 
+    <div part="section-endpoint-head-path" class="path "> 
+      <!--?lit$986794476$-->/action/current_package_list_with_resources 
+      <!--?lit$986794476$-->
+    </div>
+    <!--?lit$986794476$-->
+    <!--?lit$986794476$-->
+        <div class="only-large-screen" style="min-width:60px; flex:1"></div>
+        <div part="section-endpoint-head-description" class="descr"><!--?lit$986794476$-->Return a list of the site's datasets (packages) and their resources. </div>
+  </summary>
+        
+                  <!--?lit$986794476$-->
+                </section><!----><!---->
+                <section part="section-endpoint" id="get-/action/package_autocomplete" class="m-endpoint regular-font get collapsed">
+                  <!--?lit$986794476$-->
+  <summary part="section-endpoint-head-collapsed" class="endpoint-head get  collapsed">
+    <div part="section-endpoint-head-method" class="method get "> <!--?lit$986794476$-->get </div> 
+    <div part="section-endpoint-head-path" class="path "> 
+      <!--?lit$986794476$-->/action/package_autocomplete 
+      <!--?lit$986794476$-->
+    </div>
+    <!--?lit$986794476$-->
+    <!--?lit$986794476$-->
+        <div class="only-large-screen" style="min-width:60px; flex:1"></div>
+        <div part="section-endpoint-head-description" class="descr"><!--?lit$986794476$-->Return a list of datasets (packages) that match a string. </div>
+  </summary>
+        
+                  <!--?lit$986794476$-->
+                </section><!----><!---->
+                <section part="section-endpoint" id="get-/action/group_package_show" class="m-endpoint regular-font get collapsed">
+                  <!--?lit$986794476$-->
+  <summary part="section-endpoint-head-collapsed" class="endpoint-head get  collapsed">
+    <div part="section-endpoint-head-method" class="method get "> <!--?lit$986794476$-->get </div> 
+    <div part="section-endpoint-head-path" class="path "> 
+      <!--?lit$986794476$-->/action/group_package_show 
+      <!--?lit$986794476$-->
+    </div>
+    <!--?lit$986794476$-->
+    <!--?lit$986794476$-->
+        <div class="only-large-screen" style="min-width:60px; flex:1"></div>
+        <div part="section-endpoint-head-description" class="descr"><!--?lit$986794476$-->Return the datasets (packages) of a group </div>
+  </summary>
+        
+                  <!--?lit$986794476$-->
+                </section><!----><!---->
+                <section part="section-endpoint" id="get-/action/resource_show" class="m-endpoint regular-font get expanded">
+                  <!--?lit$986794476$-->
+  <summary part="section-endpoint-head-expanded" class="endpoint-head get  expanded">
+    <div part="section-endpoint-head-method" class="method get "> <!--?lit$986794476$-->get </div> 
+    <div part="section-endpoint-head-path" class="path "> 
+      <!--?lit$986794476$-->/action/resource_show 
+      <!--?lit$986794476$-->
+    </div>
+    <!--?lit$986794476$-->
+    <!--?lit$986794476$-->
+        <div class="only-large-screen" style="min-width:60px; flex:1"></div>
+        <div part="section-endpoint-head-description" class="descr"><!--?lit$986794476$-->Return the metadata of a resource. </div>
+  </summary>
+        
+                  <!--?lit$986794476$-->
+  <div part="section-endpoint-body-expanded" class="endpoint-body get ">
+    <div class="summary">
+      <!--?lit$986794476$--><div class="title" part="section-endpoint-body-title"><!--?lit$986794476$-->Return the metadata of a resource.</div>
+      <!--?lit$986794476$-->
+
+      <!--?lit$986794476$-->
+      <!--?lit$986794476$-->
+      <slot name="get-/action/resource_show"></slot>
+      <!--?lit$986794476$-->
+      <!--?lit$986794476$-->
+    </div>  
+    <div class="req-resp-container"> 
+      <div style="display:flex; flex-direction:column" class="view-mode-request column-layout">
+        <api-request style="width:100%;" exportparts="wrap-request-btn:wrap-request-btn, btn:btn, btn-fill:btn-fill, btn-outline:btn-outline, btn-try:btn-try, btn-clear:btn-clear, btn-clear-resp:btn-clear-resp,
+            tab-panel:tab-panel, tab-btn:tab-btn, tab-btn-row:tab-btn-row, tab-coontent:tab-content, 
+            file-input:file-input, textbox:textbox, textbox-param:textbox-param, textarea:textarea, textarea-param:textarea-param, 
+            anchor:anchor, anchor-param-example:anchor-param-example, schema-description:schema-description, schema-multiline-toggle:schema-multiline-toggle" class="view-mode column-layout" webhook="false" method="get" path="/action/resource_show" server-url="https://www.govdata.de/ckan/api/3" active-schema-tab="example" fill-request-fields-with-example="true" allow-try="true" show-curl-before-try="" accept="application/json" render-style="view" schema-style="tree" schema-expand-level="99999" schema-description-expanded="true" allow-schema-description-expand-toggle="true" schema-hide-read-only="true" schema-hide-write-only="false" fetch-credentials=""><template shadowrootmode="open"><!---->
+    <div class="col regular-font request-panel view-mode">
+      <div class=" req-res-title "> 
+        <!--?lit$986794476$-->REQUEST
+      </div>
+      <div>
+        <!--?lit$986794476$-->
+        <!--?lit$986794476$-->
+    <div class="table-title top-gap"><!--?lit$986794476$-->QUERY-STRING PARAMETERS</div>
+    <div style="display:block; overflow-x:auto; max-width:100%;">
+      <table role="presentation" class="m-table" style="width:100%; word-break:break-word;">
+        <!--?lit$986794476$--><!---->
+      <tr title=""> 
+        <td rowspan="1" style="width:160px; min-width:100px;">
+          <div class="param-name ">
+            <!--?lit$986794476$-->
+            <!--?lit$986794476$--><span style="color:var(--red)">*</span>
+            <!--?lit$986794476$-->id
+          </div>
+          <div class="param-type">
+            <!--?lit$986794476$-->string
+          </div>
+        </td>  
+        <!--?lit$986794476$-->
+            <td style="min-width:100px;" colspan="2">
+              <!--?lit$986794476$-->
+                    <input spellcheck="false" style="width:100%" class="request-param" part="textbox textbox-param" data-array="false" type="text" id="input-request-param-id" data-ptype="query" data-pname="id" data-example="" data-param-allow-reserved="false" data-x-fill-example="yes">
+            </td>
+        <!--?lit$986794476$--><td></td>
+      </tr>
+      <tr>
+        <!--?lit$986794476$--><td style="border:none"> </td>
+        <td colspan="2" style="border:none">
+          <span class="m-markdown-small"><!--?lit$986794476$--><p>the id of the resource</p>
+</span>
+          <!--?lit$986794476$--> <!--?lit$986794476$--><!--?-->
+        </td>
+      </tr>
+    <!----><!---->
+      <tr title=""> 
+        <td rowspan="1" style="width:160px; min-width:100px;">
+          <div class="param-name ">
+            <!--?lit$986794476$-->
+            <!--?lit$986794476$-->
+            <!--?lit$986794476$-->include_tracking
+          </div>
+          <div class="param-type">
+            <!--?lit$986794476$-->boolean
+          </div>
+        </td>  
+        <!--?lit$986794476$-->
+            <td style="min-width:100px;" colspan="1">
+              <!--?lit$986794476$-->
+                    <input spellcheck="false" style="width:100%" class="request-param" part="textbox textbox-param" data-array="false" type="text" id="input-request-param-include_tracking" data-ptype="query" data-pname="include_tracking" data-example="" data-param-allow-reserved="false" data-x-fill-example="yes">
+            </td>
+        <!--?lit$986794476$-->
+            <td colspan="1">
+              <div class="param-constraint">
+                <!--?lit$986794476$--><span style="font-weight:bold">Default: </span><!--?lit$986794476$-->false<br>
+                <!--?lit$986794476$-->
+                <!--?lit$986794476$-->
+                <!--?lit$986794476$-->
+              </div>
+            </td>
+      </tr>
+      <tr>
+        <!--?lit$986794476$--><td style="border:none"> </td>
+        <td colspan="2" style="border:none">
+          <span class="m-markdown-small"><!--?lit$986794476$--><p>Success tracking information to dataset and resources</p>
+</span>
+          <!--?lit$986794476$--> <!--?lit$986794476$--><!--?-->
+        </td>
+      </tr>
+    <!---->
+      </table>
+    </div>
+        <!--?lit$986794476$-->
+        <!--?lit$986794476$-->
+        <!--?lit$986794476$-->
+        <!--?lit$986794476$--><!--?lit$986794476$-->
+    <div style="display:flex; align-items:flex-end; margin:16px 0; font-size:var(--font-size-small);" part="wrap-request-btn">
+      <div class="hide-in-small-screen" style="flex-direction:column; margin:0; width:calc(100% - 60px);">
+        <div style="display:flex; flex-direction:row; align-items:center; overflow:hidden;"> 
+          <!--?lit$986794476$-->
+      <div style="display:flex; flex-direction:column;">
+        <!--?lit$986794476$-->
+            <div style="display:flex; align-items:baseline;">
+              <div style="font-weight:bold; padding-right:5px;">API Server</div> 
+              <span class="gray-text"> <!--?lit$986794476$-->https://www.govdata.de/ckan/api/3 </span>
+            </div>
+          
+      </div>  
+    
+        </div>
+        <div style="display:flex;">
+          <div style="font-weight:bold; padding-right:5px;">Authentication</div>
+          <!--?lit$986794476$--><span class="gray-text"> Not Required </span>
+        </div>
+      </div>
+      <!--?lit$986794476$-->
+            <button class="m-btn thin-border" part="btn btn-outline btn-fill" style="margin-right:5px;" title="Fills with example data (if provided)">
+              FILL EXAMPLE
+            </button>
+            <button class="m-btn thin-border" part="btn btn-outline btn-clear" style="margin-right:5px;">
+              CLEAR
+            </button>
+      <button class="m-btn primary thin-border" part="btn btn-try">TRY</button>
+    </div>
+    <div class="row" style="font-size:var(--font-size-small); margin:5px 0">
+      <!--?lit$986794476$-->
+    </div>
+    <!--?lit$986794476$-->
+    <!--?-->
+      </div>  
+    </div>
+    </template> </api-request>
+
+          <!--?lit$986794476$-->
+        </div>  
+
+        <api-response style="width:100%;" exportparts="btn:btn, btn-fill:btn-fill, btn-outline:btn-outline, btn-try:btn-try, file-input:file-input, 
+            textbox:textbox, textbox-param:textbox-param, textarea:textarea, textarea-param:textarea-param, anchor:anchor, anchor-param-example:anchor-param-example, btn-clear-resp:btn-clear-resp,
+            tab-panel:tab-panel, tab-btn:tab-btn, tab-btn-row:tab-btn-row, tab-coontent:tab-content, 
+            schema-description:schema-description, schema-multiline-toggle:schema-multiline-toggle" class="view-mode" webhook="false" active-schema-tab="example" render-style="view" schema-style="tree" schema-expand-level="99999" schema-description-expanded="true" allow-schema-description-expand-toggle="true" schema-hide-read-only="false" schema-hide-write-only="true" selected-status="200"><template shadowrootmode="open"><!---->
+    <div class="col regular-font response-panel view-mode">
+      <div class=" req-res-title "> 
+        <!--?lit$986794476$-->RESPONSE
+      </div>
+      <div>
+        <!--?lit$986794476$-->
+      <!--?lit$986794476$--><div class="row" style="flex-wrap:wrap">
+          <!--?lit$986794476$--><!---->
+            <!--?lit$986794476$-->
+                <button style="margin: 8px 4px 0 0" class="m-btn small primary" part="btn btn-response-status btn-selected-response-status"> 
+                  <!--?lit$986794476$-->200 
+                </button><!--?--><!----><!---->
+            <!--?lit$986794476$-->
+                <button style="margin: 8px 4px 0 0" class="m-btn small " part="btn  btn-response-status"> 
+                  <!--?lit$986794476$-->400 
+                </button><!--?--><!----></div>
+
+      <!--?lit$986794476$--><!---->
+        <div style="display: block">
+          <div class="top-gap">
+            <span class="resp-descr m-markdown "><!--?lit$986794476$--><p>details of the package</p>
+</span>
+            <!--?lit$986794476$-->
+          </div>
+          <!--?lit$986794476$-->  
+              <div part="tab-panel" class="tab-panel col">
+                <div part="tab-btn-row" class="tab-buttons row">
+                  <button part="tab-btn" data-tab="example" class="tab-btn active">EXAMPLE </button>
+                  <button part="tab-btn" data-tab="schema" class="tab-btn ">SCHEMA</button>
+                  <div style="flex:1"></div>
+                  <!--?lit$986794476$--><span class="small-font-size gray-text" style="align-self:center; margin-top:8px;"> <!--?lit$986794476$-->application/json </span>
+                </div>
+                <!--?lit$986794476$--><div part="tab-content" class="tab-content col" style="flex:1;">
+                      <!--?lit$986794476$-->
+      <!--?lit$986794476$-->
+          <!--?lit$986794476$-->
+              <!--?lit$986794476$-->
+              <!--?lit$986794476$-->
+              <json-tree exportparts="btn:btn, btn-fill:btn-fill, btn-copy:btn-copy" render-style="view" class="example-panel border-top pad-top-8"><template shadowrootmode="open"><!---->
+      <div class="json-tree">
+        <div class="toolbar"> 
+          <button class="toolbar-btn btn-copy" part="btn btn-fill btn-copy"> Copy </button>
+        </div>
+          <!--?lit$986794476$-->
+      <div class="open-bracket expanded object"> <!--?lit$986794476$-->{</div>
+      <div class="inside-bracket">
+        <!--?lit$986794476$--><!---->
+          <div class="item"> 
+            <!--?lit$986794476$-->"<!--?lit$986794476$-->cache_last_updated":
+            <!--?lit$986794476$--><span class="string">"<!--?lit$986794476$-->string"</span><!--?lit$986794476$-->,<!--?-->
+          </div><!----><!---->
+          <div class="item"> 
+            <!--?lit$986794476$-->"<!--?lit$986794476$-->cache_url":
+            <!--?lit$986794476$--><span class="string">"<!--?lit$986794476$-->string"</span><!--?lit$986794476$-->,<!--?-->
+          </div><!----><!---->
+          <div class="item"> 
+            <!--?lit$986794476$-->"<!--?lit$986794476$-->characterset":
+            <!--?lit$986794476$--><span class="string">"<!--?lit$986794476$-->string"</span><!--?lit$986794476$-->,<!--?-->
+          </div><!----><!---->
+          <div class="item"> 
+            <!--?lit$986794476$-->"<!--?lit$986794476$-->created":
+            <!--?lit$986794476$--><span class="string">"<!--?lit$986794476$-->string"</span><!--?lit$986794476$-->,<!--?-->
+          </div><!----><!---->
+          <div class="item"> 
+            <!--?lit$986794476$-->"<!--?lit$986794476$-->datastore_active":
+            <!--?lit$986794476$--><span class="boolean"><!--?lit$986794476$-->false</span><!--?lit$986794476$-->,<!--?-->
+          </div><!----><!---->
+          <div class="item"> 
+            <!--?lit$986794476$-->"<!--?lit$986794476$-->description":
+            <!--?lit$986794476$--><span class="string">"<!--?lit$986794476$-->string"</span><!--?lit$986794476$-->,<!--?-->
+          </div><!----><!---->
+          <div class="item"> 
+            <!--?lit$986794476$-->"<!--?lit$986794476$-->format":
+            <!--?lit$986794476$--><span class="string">"<!--?lit$986794476$-->string"</span><!--?lit$986794476$-->,<!--?-->
+          </div><!----><!---->
+          <div class="item"> 
+            <!--?lit$986794476$-->"<!--?lit$986794476$-->hash":
+            <!--?lit$986794476$--><span class="string">"<!--?lit$986794476$-->string"</span><!--?lit$986794476$-->,<!--?-->
+          </div><!----><!---->
+          <div class="item"> 
+            <!--?lit$986794476$-->"<!--?lit$986794476$-->id":
+            <!--?lit$986794476$--><span class="string">"<!--?lit$986794476$-->string"</span><!--?lit$986794476$-->,<!--?-->
+          </div><!----><!---->
+          <div class="item"> 
+            <!--?lit$986794476$-->"<!--?lit$986794476$-->language":
+            <!--?lit$986794476$--><span class="string">"<!--?lit$986794476$-->string"</span><!--?lit$986794476$-->,<!--?-->
+          </div><!----><!---->
+          <div class="item"> 
+            <!--?lit$986794476$-->"<!--?lit$986794476$-->last_modified":
+            <!--?lit$986794476$--><span class="string">"<!--?lit$986794476$-->string"</span><!--?lit$986794476$-->,<!--?-->
+          </div><!----><!---->
+          <div class="item"> 
+            <!--?lit$986794476$-->"<!--?lit$986794476$-->lastmodified":
+            <!--?lit$986794476$--><span class="string">"<!--?lit$986794476$-->string"</span><!--?lit$986794476$-->,<!--?-->
+          </div><!----><!---->
+          <div class="item"> 
+            <!--?lit$986794476$-->"<!--?lit$986794476$-->metadata_modified":
+            <!--?lit$986794476$--><span class="string">"<!--?lit$986794476$-->string"</span><!--?lit$986794476$-->,<!--?-->
+          </div><!----><!---->
+          <div class="item"> 
+            <!--?lit$986794476$-->"<!--?lit$986794476$-->mimetype":
+            <!--?lit$986794476$--><span class="string">"<!--?lit$986794476$-->string"</span><!--?lit$986794476$-->,<!--?-->
+          </div><!----><!---->
+          <div class="item"> 
+            <!--?lit$986794476$-->"<!--?lit$986794476$-->mimetype_inner":
+            <!--?lit$986794476$--><span class="string">"<!--?lit$986794476$-->string"</span><!--?lit$986794476$-->,<!--?-->
+          </div><!----><!---->
+          <div class="item"> 
+            <!--?lit$986794476$-->"<!--?lit$986794476$-->name":
+            <!--?lit$986794476$--><span class="string">"<!--?lit$986794476$-->string"</span><!--?lit$986794476$-->,<!--?-->
+          </div><!----><!---->
+          <div class="item"> 
+            <!--?lit$986794476$-->"<!--?lit$986794476$-->package_id":
+            <!--?lit$986794476$--><span class="string">"<!--?lit$986794476$-->string"</span><!--?lit$986794476$-->,<!--?-->
+          </div><!----><!---->
+          <div class="item"> 
+            <!--?lit$986794476$-->"<!--?lit$986794476$-->position":
+            <!--?lit$986794476$--><span class="number"><!--?lit$986794476$-->0</span><!--?lit$986794476$-->,<!--?-->
+          </div><!----><!---->
+          <div class="item"> 
+            <!--?lit$986794476$-->"<!--?lit$986794476$-->resource_type":
+            <!--?lit$986794476$--><span class="string">"<!--?lit$986794476$-->string"</span><!--?lit$986794476$-->,<!--?-->
+          </div><!----><!---->
+          <div class="item"> 
+            <!--?lit$986794476$-->"<!--?lit$986794476$-->size":
+            <!--?lit$986794476$--><span class="string">"<!--?lit$986794476$-->string"</span><!--?lit$986794476$-->,<!--?-->
+          </div><!----><!---->
+          <div class="item"> 
+            <!--?lit$986794476$-->"<!--?lit$986794476$-->state":
+            <!--?lit$986794476$--><span class="string">"<!--?lit$986794476$-->string"</span><!--?lit$986794476$-->,<!--?-->
+          </div><!----><!---->
+          <div class="item"> 
+            <!--?lit$986794476$-->"<!--?lit$986794476$-->url":
+            <!--?lit$986794476$--><span class="string">"<!--?lit$986794476$-->string"</span><!--?lit$986794476$-->,<!--?-->
+          </div><!----><!---->
+          <div class="item"> 
+            <!--?lit$986794476$-->"<!--?lit$986794476$-->url_type":
+            <!--?lit$986794476$--><span class="string">"<!--?lit$986794476$-->string"</span><!--?lit$986794476$--><!--?-->
+          </div><!---->
+      </div>
+      <div class="close-bracket"><!--?lit$986794476$-->}<!--?lit$986794476$--></div>
+      
+      </div>  
+    </template></json-tree><!--?-->
+    
+                    </div>
+              </div>
+            </div><!----><!---->
+        <div style="display: none">
+          <div class="top-gap">
+            <span class="resp-descr m-markdown "><!--?lit$986794476$--><p>bad input parameter</p>
+</span>
+            <!--?lit$986794476$-->
+          </div>
+          <!--?lit$986794476$--></div><!---->
+    
+      </div>  
+    </div>  
+    </template> </api-response>
+      </div>
+  </div>
+                </section><!----><!---->
+                <section part="section-endpoint" id="get-/action/resource_view_show" class="m-endpoint regular-font get expanded">
+                  <!--?lit$986794476$-->
+  <summary part="section-endpoint-head-expanded" class="endpoint-head get  expanded">
+    <div part="section-endpoint-head-method" class="method get "> <!--?lit$986794476$-->get </div> 
+    <div part="section-endpoint-head-path" class="path "> 
+      <!--?lit$986794476$-->/action/resource_view_show 
+      <!--?lit$986794476$-->
+    </div>
+    <!--?lit$986794476$-->
+    <!--?lit$986794476$-->
+        <div class="only-large-screen" style="min-width:60px; flex:1"></div>
+        <div part="section-endpoint-head-description" class="descr"><!--?lit$986794476$-->Return the metadata of a resource_view. </div>
+  </summary>
+        
+                  <!--?lit$986794476$-->
+  <div part="section-endpoint-body-expanded" class="endpoint-body get ">
+    <div class="summary">
+      <!--?lit$986794476$--><div class="title" part="section-endpoint-body-title"><!--?lit$986794476$-->Return the metadata of a resource_view.</div>
+      <!--?lit$986794476$-->
+
+      <!--?lit$986794476$-->
+      <!--?lit$986794476$-->
+      <slot name="get-/action/resource_view_show"></slot>
+      <!--?lit$986794476$-->
+      <!--?lit$986794476$-->
+    </div>  
+    <div class="req-resp-container"> 
+      <div style="display:flex; flex-direction:column" class="view-mode-request column-layout">
+        <api-request style="width:100%;" exportparts="wrap-request-btn:wrap-request-btn, btn:btn, btn-fill:btn-fill, btn-outline:btn-outline, btn-try:btn-try, btn-clear:btn-clear, btn-clear-resp:btn-clear-resp,
+            tab-panel:tab-panel, tab-btn:tab-btn, tab-btn-row:tab-btn-row, tab-coontent:tab-content, 
+            file-input:file-input, textbox:textbox, textbox-param:textbox-param, textarea:textarea, textarea-param:textarea-param, 
+            anchor:anchor, anchor-param-example:anchor-param-example, schema-description:schema-description, schema-multiline-toggle:schema-multiline-toggle" class="view-mode column-layout" webhook="false" method="get" path="/action/resource_view_show" server-url="https://www.govdata.de/ckan/api/3" active-schema-tab="example" fill-request-fields-with-example="true" allow-try="true" show-curl-before-try="" accept="application/json" render-style="view" schema-style="tree" schema-expand-level="99999" schema-description-expanded="true" allow-schema-description-expand-toggle="true" schema-hide-read-only="true" schema-hide-write-only="false" fetch-credentials=""><template shadowrootmode="open"><!---->
+    <div class="col regular-font request-panel view-mode">
+      <div class=" req-res-title "> 
+        <!--?lit$986794476$-->REQUEST
+      </div>
+      <div>
+        <!--?lit$986794476$-->
+        <!--?lit$986794476$-->
+    <div class="table-title top-gap"><!--?lit$986794476$-->QUERY-STRING PARAMETERS</div>
+    <div style="display:block; overflow-x:auto; max-width:100%;">
+      <table role="presentation" class="m-table" style="width:100%; word-break:break-word;">
+        <!--?lit$986794476$--><!---->
+      <tr title=""> 
+        <td rowspan="1" style="width:160px; min-width:100px;">
+          <div class="param-name ">
+            <!--?lit$986794476$-->
+            <!--?lit$986794476$--><span style="color:var(--red)">*</span>
+            <!--?lit$986794476$-->id
+          </div>
+          <div class="param-type">
+            <!--?lit$986794476$-->string
+          </div>
+        </td>  
+        <!--?lit$986794476$-->
+            <td style="min-width:100px;" colspan="2">
+              <!--?lit$986794476$-->
+                    <input spellcheck="false" style="width:100%" class="request-param" part="textbox textbox-param" data-array="false" type="text" id="input-request-param-id" data-ptype="query" data-pname="id" data-example="" data-param-allow-reserved="false" data-x-fill-example="yes">
+            </td>
+        <!--?lit$986794476$--><td></td>
+      </tr>
+      <tr>
+        <!--?lit$986794476$--><td style="border:none"> </td>
+        <td colspan="2" style="border:none">
+          <span class="m-markdown-small"><!--?lit$986794476$--><!--?--></span>
+          <!--?lit$986794476$--> <!--?lit$986794476$--><!--?-->
+        </td>
+      </tr>
+    <!---->
+      </table>
+    </div>
+        <!--?lit$986794476$-->
+        <!--?lit$986794476$-->
+        <!--?lit$986794476$-->
+        <!--?lit$986794476$--><!--?lit$986794476$-->
+    <div style="display:flex; align-items:flex-end; margin:16px 0; font-size:var(--font-size-small);" part="wrap-request-btn">
+      <div class="hide-in-small-screen" style="flex-direction:column; margin:0; width:calc(100% - 60px);">
+        <div style="display:flex; flex-direction:row; align-items:center; overflow:hidden;"> 
+          <!--?lit$986794476$-->
+      <div style="display:flex; flex-direction:column;">
+        <!--?lit$986794476$-->
+            <div style="display:flex; align-items:baseline;">
+              <div style="font-weight:bold; padding-right:5px;">API Server</div> 
+              <span class="gray-text"> <!--?lit$986794476$-->https://www.govdata.de/ckan/api/3 </span>
+            </div>
+          
+      </div>  
+    
+        </div>
+        <div style="display:flex;">
+          <div style="font-weight:bold; padding-right:5px;">Authentication</div>
+          <!--?lit$986794476$--><span class="gray-text"> Not Required </span>
+        </div>
+      </div>
+      <!--?lit$986794476$-->
+            <button class="m-btn thin-border" part="btn btn-outline btn-fill" style="margin-right:5px;" title="Fills with example data (if provided)">
+              FILL EXAMPLE
+            </button>
+            <button class="m-btn thin-border" part="btn btn-outline btn-clear" style="margin-right:5px;">
+              CLEAR
+            </button>
+      <button class="m-btn primary thin-border" part="btn btn-try">TRY</button>
+    </div>
+    <div class="row" style="font-size:var(--font-size-small); margin:5px 0">
+      <!--?lit$986794476$-->
+    </div>
+    <!--?lit$986794476$-->
+    <!--?-->
+      </div>  
+    </div>
+    </template> </api-request>
+
+          <!--?lit$986794476$-->
+        </div>  
+
+        <api-response style="width:100%;" exportparts="btn:btn, btn-fill:btn-fill, btn-outline:btn-outline, btn-try:btn-try, file-input:file-input, 
+            textbox:textbox, textbox-param:textbox-param, textarea:textarea, textarea-param:textarea-param, anchor:anchor, anchor-param-example:anchor-param-example, btn-clear-resp:btn-clear-resp,
+            tab-panel:tab-panel, tab-btn:tab-btn, tab-btn-row:tab-btn-row, tab-coontent:tab-content, 
+            schema-description:schema-description, schema-multiline-toggle:schema-multiline-toggle" class="view-mode" webhook="false" active-schema-tab="example" render-style="view" schema-style="tree" schema-expand-level="99999" schema-description-expanded="true" allow-schema-description-expand-toggle="true" schema-hide-read-only="false" schema-hide-write-only="true" selected-status="200"><template shadowrootmode="open"><!---->
+    <div class="col regular-font response-panel view-mode">
+      <div class=" req-res-title "> 
+        <!--?lit$986794476$-->RESPONSE
+      </div>
+      <div>
+        <!--?lit$986794476$-->
+      <!--?lit$986794476$--><div class="row" style="flex-wrap:wrap">
+          <!--?lit$986794476$--><!---->
+            <!--?lit$986794476$-->
+                <button style="margin: 8px 4px 0 0" class="m-btn small primary" part="btn btn-response-status btn-selected-response-status"> 
+                  <!--?lit$986794476$-->200 
+                </button><!--?--><!----><!---->
+            <!--?lit$986794476$-->
+                <button style="margin: 8px 4px 0 0" class="m-btn small " part="btn  btn-response-status"> 
+                  <!--?lit$986794476$-->400 
+                </button><!--?--><!----></div>
+
+      <!--?lit$986794476$--><!---->
+        <div style="display: block">
+          <div class="top-gap">
+            <span class="resp-descr m-markdown "><!--?lit$986794476$--><p>the resource view</p>
+</span>
+            <!--?lit$986794476$-->
+          </div>
+          <!--?lit$986794476$-->  
+              <div part="tab-panel" class="tab-panel col">
+                <div part="tab-btn-row" class="tab-buttons row">
+                  <button part="tab-btn" data-tab="example" class="tab-btn active">EXAMPLE </button>
+                  <button part="tab-btn" data-tab="schema" class="tab-btn ">SCHEMA</button>
+                  <div style="flex:1"></div>
+                  <!--?lit$986794476$--><span class="small-font-size gray-text" style="align-self:center; margin-top:8px;"> <!--?lit$986794476$-->application/json </span>
+                </div>
+                <!--?lit$986794476$--><div part="tab-content" class="tab-content col" style="flex:1;">
+                      <!--?lit$986794476$-->
+      <!--?lit$986794476$-->
+          <!--?lit$986794476$-->
+              <!--?lit$986794476$-->
+              <!--?lit$986794476$-->
+              <json-tree exportparts="btn:btn, btn-fill:btn-fill, btn-copy:btn-copy" render-style="view" class="example-panel border-top pad-top-8"><template shadowrootmode="open"><!---->
+      <div class="json-tree">
+        <div class="toolbar"> 
+          <button class="toolbar-btn btn-copy" part="btn btn-fill btn-copy"> Copy </button>
+        </div>
+          <!--?lit$986794476$-->
+      <div class="open-bracket expanded object"> <!--?lit$986794476$-->{</div>
+      <div class="inside-bracket">
+        <!--?lit$986794476$--><!---->
+          <div class="item"> 
+            <!--?lit$986794476$-->"<!--?lit$986794476$-->help":
+            <!--?lit$986794476$--><span class="string">"<!--?lit$986794476$-->string"</span><!--?lit$986794476$-->,<!--?-->
+          </div><!----><!---->
+          <div class="item"> 
+            <!--?lit$986794476$-->"<!--?lit$986794476$-->success":
+            <!--?lit$986794476$--><span class="boolean"><!--?lit$986794476$-->false</span><!--?lit$986794476$-->,<!--?-->
+          </div><!----><!---->
+          <div class="item"> 
+            <!--?lit$986794476$-->"<!--?lit$986794476$-->result":
+            <!--?lit$986794476$-->
+      <div class="open-bracket expanded array"> <!--?lit$986794476$-->[</div>
+      <div class="inside-bracket">
+        <!--?lit$986794476$--><!---->
+          <div class="item"> 
+            <!--?lit$986794476$-->
+            <!--?lit$986794476$-->
+      <div class="open-bracket expanded object"> <!--?lit$986794476$-->{</div>
+      <div class="inside-bracket">
+        <!--?lit$986794476$--><!---->
+          <div class="item"> 
+            <!--?lit$986794476$-->"<!--?lit$986794476$-->id":
+            <!--?lit$986794476$--><span class="string">"<!--?lit$986794476$-->string"</span><!--?lit$986794476$-->,<!--?-->
+          </div><!----><!---->
+          <div class="item"> 
+            <!--?lit$986794476$-->"<!--?lit$986794476$-->resource_id":
+            <!--?lit$986794476$--><span class="string">"<!--?lit$986794476$-->string"</span><!--?lit$986794476$-->,<!--?-->
+          </div><!----><!---->
+          <div class="item"> 
+            <!--?lit$986794476$-->"<!--?lit$986794476$-->package_id":
+            <!--?lit$986794476$--><span class="string">"<!--?lit$986794476$-->string"</span><!--?lit$986794476$-->,<!--?-->
+          </div><!----><!---->
+          <div class="item"> 
+            <!--?lit$986794476$-->"<!--?lit$986794476$-->title":
+            <!--?lit$986794476$--><span class="string">"<!--?lit$986794476$-->string"</span><!--?lit$986794476$-->,<!--?-->
+          </div><!----><!---->
+          <div class="item"> 
+            <!--?lit$986794476$-->"<!--?lit$986794476$-->description":
+            <!--?lit$986794476$--><span class="string">"<!--?lit$986794476$-->string"</span><!--?lit$986794476$-->,<!--?-->
+          </div><!----><!---->
+          <div class="item"> 
+            <!--?lit$986794476$-->"<!--?lit$986794476$-->view_type":
+            <!--?lit$986794476$--><span class="string">"<!--?lit$986794476$-->string"</span><!--?lit$986794476$--><!--?-->
+          </div><!---->
+      </div>
+      <div class="close-bracket"><!--?lit$986794476$-->}<!--?lit$986794476$--></div>
+      
+          </div><!---->
+      </div>
+      <div class="close-bracket"><!--?lit$986794476$-->]<!--?lit$986794476$--></div>
+      
+          </div><!---->
+      </div>
+      <div class="close-bracket"><!--?lit$986794476$-->}<!--?lit$986794476$--></div>
+      
+      </div>  
+    </template></json-tree><!--?-->
+    
+                    </div>
+              </div>
+            </div><!----><!---->
+        <div style="display: none">
+          <div class="top-gap">
+            <span class="resp-descr m-markdown "><!--?lit$986794476$--><p>bad input parameter</p>
+</span>
+            <!--?lit$986794476$-->
+          </div>
+          <!--?lit$986794476$--></div><!---->
+    
+      </div>  
+    </div>  
+    </template> </api-response>
+      </div>
+  </div>
+                </section><!----><!---->
+                <section part="section-endpoint" id="get-/action/resource_view_list" class="m-endpoint regular-font get expanded">
+                  <!--?lit$986794476$-->
+  <summary part="section-endpoint-head-expanded" class="endpoint-head get  expanded">
+    <div part="section-endpoint-head-method" class="method get "> <!--?lit$986794476$-->get </div> 
+    <div part="section-endpoint-head-path" class="path "> 
+      <!--?lit$986794476$-->/action/resource_view_list 
+      <!--?lit$986794476$-->
+    </div>
+    <!--?lit$986794476$-->
+    <!--?lit$986794476$-->
+        <div class="only-large-screen" style="min-width:60px; flex:1"></div>
+        <div part="section-endpoint-head-description" class="descr"><!--?lit$986794476$-->Return the list of resource views for a particular resource </div>
+  </summary>
+        
+                  <!--?lit$986794476$-->
+  <div part="section-endpoint-body-expanded" class="endpoint-body get ">
+    <div class="summary">
+      <!--?lit$986794476$--><div class="title" part="section-endpoint-body-title"><!--?lit$986794476$-->Return the list of resource views for a particular resource</div>
+      <!--?lit$986794476$-->
+
+      <!--?lit$986794476$--><div part="section-endpoint-body-description" class="m-markdown"> <!--?lit$986794476$--><p>:param id: the id of the resource
+  :type id: string\n
+  :rtype: list of dictionaries.\n</p>
+</div>
+      <!--?lit$986794476$-->
+      <slot name="get-/action/resource_view_list"></slot>
+      <!--?lit$986794476$-->
+      <!--?lit$986794476$-->
+    </div>  
+    <div class="req-resp-container"> 
+      <div style="display:flex; flex-direction:column" class="view-mode-request column-layout">
+        <api-request style="width:100%;" exportparts="wrap-request-btn:wrap-request-btn, btn:btn, btn-fill:btn-fill, btn-outline:btn-outline, btn-try:btn-try, btn-clear:btn-clear, btn-clear-resp:btn-clear-resp,
+            tab-panel:tab-panel, tab-btn:tab-btn, tab-btn-row:tab-btn-row, tab-coontent:tab-content, 
+            file-input:file-input, textbox:textbox, textbox-param:textbox-param, textarea:textarea, textarea-param:textarea-param, 
+            anchor:anchor, anchor-param-example:anchor-param-example, schema-description:schema-description, schema-multiline-toggle:schema-multiline-toggle" class="view-mode column-layout" webhook="false" method="get" path="/action/resource_view_list" server-url="https://www.govdata.de/ckan/api/3" active-schema-tab="example" fill-request-fields-with-example="true" allow-try="true" show-curl-before-try="" accept="application/json" render-style="view" schema-style="tree" schema-expand-level="99999" schema-description-expanded="true" allow-schema-description-expand-toggle="true" schema-hide-read-only="true" schema-hide-write-only="false" fetch-credentials=""><template shadowrootmode="open"><!---->
+    <div class="col regular-font request-panel view-mode">
+      <div class=" req-res-title "> 
+        <!--?lit$986794476$-->REQUEST
+      </div>
+      <div>
+        <!--?lit$986794476$-->
+        <!--?lit$986794476$-->
+    <div class="table-title top-gap"><!--?lit$986794476$-->QUERY-STRING PARAMETERS</div>
+    <div style="display:block; overflow-x:auto; max-width:100%;">
+      <table role="presentation" class="m-table" style="width:100%; word-break:break-word;">
+        <!--?lit$986794476$--><!---->
+      <tr title=""> 
+        <td rowspan="1" style="width:160px; min-width:100px;">
+          <div class="param-name ">
+            <!--?lit$986794476$-->
+            <!--?lit$986794476$--><span style="color:var(--red)">*</span>
+            <!--?lit$986794476$-->id
+          </div>
+          <div class="param-type">
+            <!--?lit$986794476$-->string
+          </div>
+        </td>  
+        <!--?lit$986794476$-->
+            <td style="min-width:100px;" colspan="2">
+              <!--?lit$986794476$-->
+                    <input spellcheck="false" style="width:100%" class="request-param" part="textbox textbox-param" data-array="false" type="text" id="input-request-param-id" data-ptype="query" data-pname="id" data-example="" data-param-allow-reserved="false" data-x-fill-example="yes">
+            </td>
+        <!--?lit$986794476$--><td></td>
+      </tr>
+      <tr>
+        <!--?lit$986794476$--><td style="border:none"> </td>
+        <td colspan="2" style="border:none">
+          <span class="m-markdown-small"><!--?lit$986794476$--><!--?--></span>
+          <!--?lit$986794476$--> <!--?lit$986794476$--><!--?-->
+        </td>
+      </tr>
+    <!---->
+      </table>
+    </div>
+        <!--?lit$986794476$-->
+        <!--?lit$986794476$-->
+        <!--?lit$986794476$-->
+        <!--?lit$986794476$--><!--?lit$986794476$-->
+    <div style="display:flex; align-items:flex-end; margin:16px 0; font-size:var(--font-size-small);" part="wrap-request-btn">
+      <div class="hide-in-small-screen" style="flex-direction:column; margin:0; width:calc(100% - 60px);">
+        <div style="display:flex; flex-direction:row; align-items:center; overflow:hidden;"> 
+          <!--?lit$986794476$-->
+      <div style="display:flex; flex-direction:column;">
+        <!--?lit$986794476$-->
+            <div style="display:flex; align-items:baseline;">
+              <div style="font-weight:bold; padding-right:5px;">API Server</div> 
+              <span class="gray-text"> <!--?lit$986794476$-->https://www.govdata.de/ckan/api/3 </span>
+            </div>
+          
+      </div>  
+    
+        </div>
+        <div style="display:flex;">
+          <div style="font-weight:bold; padding-right:5px;">Authentication</div>
+          <!--?lit$986794476$--><span class="gray-text"> Not Required </span>
+        </div>
+      </div>
+      <!--?lit$986794476$-->
+            <button class="m-btn thin-border" part="btn btn-outline btn-fill" style="margin-right:5px;" title="Fills with example data (if provided)">
+              FILL EXAMPLE
+            </button>
+            <button class="m-btn thin-border" part="btn btn-outline btn-clear" style="margin-right:5px;">
+              CLEAR
+            </button>
+      <button class="m-btn primary thin-border" part="btn btn-try">TRY</button>
+    </div>
+    <div class="row" style="font-size:var(--font-size-small); margin:5px 0">
+      <!--?lit$986794476$-->
+    </div>
+    <!--?lit$986794476$-->
+    <!--?-->
+      </div>  
+    </div>
+    </template> </api-request>
+
+          <!--?lit$986794476$-->
+        </div>  
+
+        <api-response style="width:100%;" exportparts="btn:btn, btn-fill:btn-fill, btn-outline:btn-outline, btn-try:btn-try, file-input:file-input, 
+            textbox:textbox, textbox-param:textbox-param, textarea:textarea, textarea-param:textarea-param, anchor:anchor, anchor-param-example:anchor-param-example, btn-clear-resp:btn-clear-resp,
+            tab-panel:tab-panel, tab-btn:tab-btn, tab-btn-row:tab-btn-row, tab-coontent:tab-content, 
+            schema-description:schema-description, schema-multiline-toggle:schema-multiline-toggle" class="view-mode" webhook="false" active-schema-tab="example" render-style="view" schema-style="tree" schema-expand-level="99999" schema-description-expanded="true" allow-schema-description-expand-toggle="true" schema-hide-read-only="false" schema-hide-write-only="true" selected-status="200"><template shadowrootmode="open"><!---->
+    <div class="col regular-font response-panel view-mode">
+      <div class=" req-res-title "> 
+        <!--?lit$986794476$-->RESPONSE
+      </div>
+      <div>
+        <!--?lit$986794476$-->
+      <!--?lit$986794476$--><div class="row" style="flex-wrap:wrap">
+          <!--?lit$986794476$--><!---->
+            <!--?lit$986794476$-->
+                <button style="margin: 8px 4px 0 0" class="m-btn small primary" part="btn btn-response-status btn-selected-response-status"> 
+                  <!--?lit$986794476$-->200 
+                </button><!--?--><!----><!---->
+            <!--?lit$986794476$-->
+                <button style="margin: 8px 4px 0 0" class="m-btn small " part="btn  btn-response-status"> 
+                  <!--?lit$986794476$-->400 
+                </button><!--?--><!----></div>
+
+      <!--?lit$986794476$--><!---->
+        <div style="display: block">
+          <div class="top-gap">
+            <span class="resp-descr m-markdown "><!--?lit$986794476$--><p>list of resource views</p>
+</span>
+            <!--?lit$986794476$-->
+          </div>
+          <!--?lit$986794476$-->  
+              <div part="tab-panel" class="tab-panel col">
+                <div part="tab-btn-row" class="tab-buttons row">
+                  <button part="tab-btn" data-tab="example" class="tab-btn active">EXAMPLE </button>
+                  <button part="tab-btn" data-tab="schema" class="tab-btn ">SCHEMA</button>
+                  <div style="flex:1"></div>
+                  <!--?lit$986794476$--><span class="small-font-size gray-text" style="align-self:center; margin-top:8px;"> <!--?lit$986794476$-->application/json </span>
+                </div>
+                <!--?lit$986794476$--><div part="tab-content" class="tab-content col" style="flex:1;">
+                      <!--?lit$986794476$-->
+      <!--?lit$986794476$-->
+          <!--?lit$986794476$-->
+              <!--?lit$986794476$-->
+              <!--?lit$986794476$-->
+              <json-tree exportparts="btn:btn, btn-fill:btn-fill, btn-copy:btn-copy" render-style="view" class="example-panel border-top pad-top-8"><template shadowrootmode="open"><!---->
+      <div class="json-tree">
+        <div class="toolbar"> 
+          <button class="toolbar-btn btn-copy" part="btn btn-fill btn-copy"> Copy </button>
+        </div>
+          <!--?lit$986794476$-->
+      <div class="open-bracket expanded object"> <!--?lit$986794476$-->{</div>
+      <div class="inside-bracket">
+        <!--?lit$986794476$--><!---->
+          <div class="item"> 
+            <!--?lit$986794476$-->"<!--?lit$986794476$-->help":
+            <!--?lit$986794476$--><span class="string">"<!--?lit$986794476$-->string"</span><!--?lit$986794476$-->,<!--?-->
+          </div><!----><!---->
+          <div class="item"> 
+            <!--?lit$986794476$-->"<!--?lit$986794476$-->success":
+            <!--?lit$986794476$--><span class="boolean"><!--?lit$986794476$-->false</span><!--?lit$986794476$-->,<!--?-->
+          </div><!----><!---->
+          <div class="item"> 
+            <!--?lit$986794476$-->"<!--?lit$986794476$-->result":
+            <!--?lit$986794476$-->
+      <div class="open-bracket expanded object"> <!--?lit$986794476$-->{</div>
+      <div class="inside-bracket">
+        <!--?lit$986794476$--><!---->
+          <div class="item"> 
+            <!--?lit$986794476$-->"<!--?lit$986794476$-->id":
+            <!--?lit$986794476$--><span class="string">"<!--?lit$986794476$-->string"</span><!--?lit$986794476$-->,<!--?-->
+          </div><!----><!---->
+          <div class="item"> 
+            <!--?lit$986794476$-->"<!--?lit$986794476$-->resource_id":
+            <!--?lit$986794476$--><span class="string">"<!--?lit$986794476$-->string"</span><!--?lit$986794476$-->,<!--?-->
+          </div><!----><!---->
+          <div class="item"> 
+            <!--?lit$986794476$-->"<!--?lit$986794476$-->package_id":
+            <!--?lit$986794476$--><span class="string">"<!--?lit$986794476$-->string"</span><!--?lit$986794476$-->,<!--?-->
+          </div><!----><!---->
+          <div class="item"> 
+            <!--?lit$986794476$-->"<!--?lit$986794476$-->title":
+            <!--?lit$986794476$--><span class="string">"<!--?lit$986794476$-->string"</span><!--?lit$986794476$-->,<!--?-->
+          </div><!----><!---->
+          <div class="item"> 
+            <!--?lit$986794476$-->"<!--?lit$986794476$-->description":
+            <!--?lit$986794476$--><span class="string">"<!--?lit$986794476$-->string"</span><!--?lit$986794476$-->,<!--?-->
+          </div><!----><!---->
+          <div class="item"> 
+            <!--?lit$986794476$-->"<!--?lit$986794476$-->view_type":
+            <!--?lit$986794476$--><span class="string">"<!--?lit$986794476$-->string"</span><!--?lit$986794476$--><!--?-->
+          </div><!---->
+      </div>
+      <div class="close-bracket"><!--?lit$986794476$-->}<!--?lit$986794476$--></div>
+      
+          </div><!---->
+      </div>
+      <div class="close-bracket"><!--?lit$986794476$-->}<!--?lit$986794476$--></div>
+      
+      </div>  
+    </template></json-tree><!--?-->
+    
+                    </div>
+              </div>
+            </div><!----><!---->
+        <div style="display: none">
+          <div class="top-gap">
+            <span class="resp-descr m-markdown "><!--?lit$986794476$--><p>bad input parameter</p>
+</span>
+            <!--?lit$986794476$-->
+          </div>
+          <!--?lit$986794476$--></div><!---->
+    
+      </div>  
+    </div>  
+    </template> </api-response>
+      </div>
+  </div>
+                </section><!----><!---->
+                <section part="section-endpoint" id="get-/action/resource_search" class="m-endpoint regular-font get collapsed">
+                  <!--?lit$986794476$-->
+  <summary part="section-endpoint-head-collapsed" class="endpoint-head get  collapsed">
+    <div part="section-endpoint-head-method" class="method get "> <!--?lit$986794476$-->get </div> 
+    <div part="section-endpoint-head-path" class="path "> 
+      <!--?lit$986794476$-->/action/resource_search 
+      <!--?lit$986794476$-->
+    </div>
+    <!--?lit$986794476$-->
+    <!--?lit$986794476$-->
+        <div class="only-large-screen" style="min-width:60px; flex:1"></div>
+        <div part="section-endpoint-head-description" class="descr"><!--?lit$986794476$-->Searches for resources satisfying a given search criteria </div>
+  </summary>
+        
+                  <!--?lit$986794476$-->
+                </section><!---->
+            </div>
+          </div>
+        
+  <!----><!---->
+      <!--?lit$986794476$--> 
+          <div class="regular-font section-gap section-tag expanded"> 
+            <div class="section-tag-header">
+              <div class="sub-title tag" style="color:var(--primary-color)" id="tag--datamanagement"><!--?lit$986794476$-->datamanagement</div>
+            </div>
+            <div class="section-tag-body">
+              <slot name="tag--datamanagement"></slot>
+              <div class="regular-font regular-font-size m-markdown" style="padding-bottom:12px">
+                <!--?lit$986794476$--><p>datamanagement</p>
+
+              </div>
+              <!--?lit$986794476$--><!---->
+                <section part="section-endpoint" id="get-/action/package_relationships_list" class="m-endpoint regular-font get collapsed">
+                  <!--?lit$986794476$-->
+  <summary part="section-endpoint-head-collapsed" class="endpoint-head get  collapsed">
+    <div part="section-endpoint-head-method" class="method get "> <!--?lit$986794476$-->get </div> 
+    <div part="section-endpoint-head-path" class="path "> 
+      <!--?lit$986794476$-->/action/package_relationships_list 
+      <!--?lit$986794476$-->
+    </div>
+    <!--?lit$986794476$-->
+    <!--?lit$986794476$-->
+        <div class="only-large-screen" style="min-width:60px; flex:1"></div>
+        <div part="section-endpoint-head-description" class="descr"><!--?lit$986794476$-->Return a dataset (package)'s relationships. </div>
+  </summary>
+        
+                  <!--?lit$986794476$-->
+                </section><!----><!---->
+                <section part="section-endpoint" id="get-/action/tag_list" class="m-endpoint regular-font get collapsed">
+                  <!--?lit$986794476$-->
+  <summary part="section-endpoint-head-collapsed" class="endpoint-head get  collapsed">
+    <div part="section-endpoint-head-method" class="method get "> <!--?lit$986794476$-->get </div> 
+    <div part="section-endpoint-head-path" class="path "> 
+      <!--?lit$986794476$-->/action/tag_list 
+      <!--?lit$986794476$-->
+    </div>
+    <!--?lit$986794476$-->
+    <!--?lit$986794476$-->
+        <div class="only-large-screen" style="min-width:60px; flex:1"></div>
+        <div part="section-endpoint-head-description" class="descr"><!--?lit$986794476$-->Return a list of the site's tags. </div>
+  </summary>
+        
+                  <!--?lit$986794476$-->
+                </section><!----><!---->
+                <section part="section-endpoint" id="get-/action/tag_show" class="m-endpoint regular-font get collapsed">
+                  <!--?lit$986794476$-->
+  <summary part="section-endpoint-head-collapsed" class="endpoint-head get  collapsed">
+    <div part="section-endpoint-head-method" class="method get "> <!--?lit$986794476$-->get </div> 
+    <div part="section-endpoint-head-path" class="path "> 
+      <!--?lit$986794476$-->/action/tag_show 
+      <!--?lit$986794476$-->
+    </div>
+    <!--?lit$986794476$-->
+    <!--?lit$986794476$-->
+        <div class="only-large-screen" style="min-width:60px; flex:1"></div>
+        <div part="section-endpoint-head-description" class="descr"><!--?lit$986794476$-->Return the details of a tag and all its datasets. </div>
+  </summary>
+        
+                  <!--?lit$986794476$-->
+                </section><!----><!---->
+                <section part="section-endpoint" id="get-/action/tag_search" class="m-endpoint regular-font get collapsed">
+                  <!--?lit$986794476$-->
+  <summary part="section-endpoint-head-collapsed" class="endpoint-head get  collapsed">
+    <div part="section-endpoint-head-method" class="method get "> <!--?lit$986794476$-->get </div> 
+    <div part="section-endpoint-head-path" class="path "> 
+      <!--?lit$986794476$-->/action/tag_search 
+      <!--?lit$986794476$-->
+    </div>
+    <!--?lit$986794476$-->
+    <!--?lit$986794476$-->
+        <div class="only-large-screen" style="min-width:60px; flex:1"></div>
+        <div part="section-endpoint-head-description" class="descr"><!--?lit$986794476$-->Return a list of tags whose names contain a given string. </div>
+  </summary>
+        
+                  <!--?lit$986794476$-->
+                </section><!---->
+            </div>
+          </div>
+        
+  <!----><!---->
+      <!--?lit$986794476$--> 
+          <div class="regular-font section-gap section-tag expanded"> 
+            <div class="section-tag-header">
+              <div class="sub-title tag" style="color:var(--primary-color)" id="tag--authentication"><!--?lit$986794476$-->authentication</div>
+            </div>
+            <div class="section-tag-body">
+              <slot name="tag--authentication"></slot>
+              <div class="regular-font regular-font-size m-markdown" style="padding-bottom:12px">
+                <!--?lit$986794476$--><p>authentication</p>
+
+              </div>
+              <!--?lit$986794476$--><!---->
+                <section part="section-endpoint" id="get-/action/api_token_list" class="m-endpoint regular-font get collapsed">
+                  <!--?lit$986794476$-->
+  <summary part="section-endpoint-head-collapsed" class="endpoint-head get  collapsed">
+    <div part="section-endpoint-head-method" class="method get "> <!--?lit$986794476$-->get </div> 
+    <div part="section-endpoint-head-path" class="path "> 
+      <!--?lit$986794476$-->/action/api_token_list 
+      <!--?lit$986794476$-->
+    </div>
+    <!--?lit$986794476$-->
+    <!--?lit$986794476$-->
+        <div class="only-large-screen" style="min-width:60px; flex:1"></div>
+        <div part="section-endpoint-head-description" class="descr"><!--?lit$986794476$-->Return list of all available API Tokens for current user </div>
+  </summary>
+        
+                  <!--?lit$986794476$-->
+                </section><!---->
+            </div>
+          </div>
+        
+  <!----><!---->
+      <!--?lit$986794476$--> 
+          <div class="regular-font section-gap section-tag expanded"> 
+            <div class="section-tag-header">
+              <div class="sub-title tag" style="color:var(--primary-color)" id="tag--activity"><!--?lit$986794476$-->activity</div>
+            </div>
+            <div class="section-tag-body">
+              <slot name="tag--activity"></slot>
+              <div class="regular-font regular-font-size m-markdown" style="padding-bottom:12px">
+                <!--?lit$986794476$--><p>activity</p>
+
+              </div>
+              <!--?lit$986794476$--><!---->
+                <section part="section-endpoint" id="get-/action/package_activity_list" class="m-endpoint regular-font get collapsed">
+                  <!--?lit$986794476$-->
+  <summary part="section-endpoint-head-collapsed" class="endpoint-head get  collapsed">
+    <div part="section-endpoint-head-method" class="method get "> <!--?lit$986794476$-->get </div> 
+    <div part="section-endpoint-head-path" class="path "> 
+      <!--?lit$986794476$-->/action/package_activity_list 
+      <!--?lit$986794476$-->
+    </div>
+    <!--?lit$986794476$-->
+    <!--?lit$986794476$-->
+        <div class="only-large-screen" style="min-width:60px; flex:1"></div>
+        <div part="section-endpoint-head-description" class="descr"><!--?lit$986794476$-->Return a package's activity stream (not including detail) </div>
+  </summary>
+        
+                  <!--?lit$986794476$-->
+                </section><!----><!---->
+                <section part="section-endpoint" id="get-/action/group_activity_list" class="m-endpoint regular-font get collapsed">
+                  <!--?lit$986794476$-->
+  <summary part="section-endpoint-head-collapsed" class="endpoint-head get  collapsed">
+    <div part="section-endpoint-head-method" class="method get "> <!--?lit$986794476$-->get </div> 
+    <div part="section-endpoint-head-path" class="path "> 
+      <!--?lit$986794476$-->/action/group_activity_list 
+      <!--?lit$986794476$-->
+    </div>
+    <!--?lit$986794476$-->
+    <!--?lit$986794476$-->
+        <div class="only-large-screen" style="min-width:60px; flex:1"></div>
+        <div part="section-endpoint-head-description" class="descr"><!--?lit$986794476$-->Return a group's activity stream </div>
+  </summary>
+        
+                  <!--?lit$986794476$-->
+                </section><!----><!---->
+                <section part="section-endpoint" id="get-/action/organization_activity_list" class="m-endpoint regular-font get collapsed">
+                  <!--?lit$986794476$-->
+  <summary part="section-endpoint-head-collapsed" class="endpoint-head get  collapsed">
+    <div part="section-endpoint-head-method" class="method get "> <!--?lit$986794476$-->get </div> 
+    <div part="section-endpoint-head-path" class="path "> 
+      <!--?lit$986794476$-->/action/organization_activity_list 
+      <!--?lit$986794476$-->
+    </div>
+    <!--?lit$986794476$-->
+    <!--?lit$986794476$-->
+        <div class="only-large-screen" style="min-width:60px; flex:1"></div>
+        <div part="section-endpoint-head-description" class="descr"><!--?lit$986794476$-->Return a organization's activity stream </div>
+  </summary>
+        
+                  <!--?lit$986794476$-->
+                </section><!----><!---->
+                <section part="section-endpoint" id="get-/action/recently_changed_packages_activity_list" class="m-endpoint regular-font get collapsed">
+                  <!--?lit$986794476$-->
+  <summary part="section-endpoint-head-collapsed" class="endpoint-head get  collapsed">
+    <div part="section-endpoint-head-method" class="method get "> <!--?lit$986794476$-->get </div> 
+    <div part="section-endpoint-head-path" class="path "> 
+      <!--?lit$986794476$-->/action/recently_changed_packages_activity_list 
+      <!--?lit$986794476$-->
+    </div>
+    <!--?lit$986794476$-->
+    <!--?lit$986794476$-->
+        <div class="only-large-screen" style="min-width:60px; flex:1"></div>
+        <div part="section-endpoint-head-description" class="descr"><!--?lit$986794476$-->Return the activity stream of all recently added or changed packages </div>
+  </summary>
+        
+                  <!--?lit$986794476$-->
+                </section><!----><!---->
+                <section part="section-endpoint" id="get-/action/activity_show" class="m-endpoint regular-font get collapsed">
+                  <!--?lit$986794476$-->
+  <summary part="section-endpoint-head-collapsed" class="endpoint-head get  collapsed">
+    <div part="section-endpoint-head-method" class="method get "> <!--?lit$986794476$-->get </div> 
+    <div part="section-endpoint-head-path" class="path "> 
+      <!--?lit$986794476$-->/action/activity_show 
+      <!--?lit$986794476$-->
+    </div>
+    <!--?lit$986794476$-->
+    <!--?lit$986794476$-->
+        <div class="only-large-screen" style="min-width:60px; flex:1"></div>
+        <div part="section-endpoint-head-description" class="descr"><!--?lit$986794476$-->Show details of an item of 'activity' (part of the activity stream). </div>
+  </summary>
+        
+                  <!--?lit$986794476$-->
+                </section><!----><!---->
+                <section part="section-endpoint" id="get-/action/activity_data_show" class="m-endpoint regular-font get collapsed">
+                  <!--?lit$986794476$-->
+  <summary part="section-endpoint-head-collapsed" class="endpoint-head get  collapsed">
+    <div part="section-endpoint-head-method" class="method get "> <!--?lit$986794476$-->get </div> 
+    <div part="section-endpoint-head-path" class="path "> 
+      <!--?lit$986794476$-->/action/activity_data_show 
+      <!--?lit$986794476$-->
+    </div>
+    <!--?lit$986794476$-->
+    <!--?lit$986794476$-->
+        <div class="only-large-screen" style="min-width:60px; flex:1"></div>
+        <div part="section-endpoint-head-description" class="descr"><!--?lit$986794476$-->Show the data from an item of 'activity' (part of the activity stream) </div>
+  </summary>
+        
+                  <!--?lit$986794476$-->
+                </section><!----><!---->
+                <section part="section-endpoint" id="get-/action/activity_diff" class="m-endpoint regular-font get collapsed">
+                  <!--?lit$986794476$-->
+  <summary part="section-endpoint-head-collapsed" class="endpoint-head get  collapsed">
+    <div part="section-endpoint-head-method" class="method get "> <!--?lit$986794476$-->get </div> 
+    <div part="section-endpoint-head-path" class="path "> 
+      <!--?lit$986794476$-->/action/activity_diff 
+      <!--?lit$986794476$-->
+    </div>
+    <!--?lit$986794476$-->
+    <!--?lit$986794476$-->
+        <div class="only-large-screen" style="min-width:60px; flex:1"></div>
+        <div part="section-endpoint-head-description" class="descr"><!--?lit$986794476$-->Returns a diff of the activity, compared to the previous version of the object </div>
+  </summary>
+        
+                  <!--?lit$986794476$-->
+                </section><!---->
+            </div>
+          </div>
+        
+  <!----><!---->
+      <!--?lit$986794476$--> 
+          <div class="regular-font section-gap section-tag expanded"> 
+            <div class="section-tag-header">
+              <div class="sub-title tag" style="color:var(--primary-color)" id="tag--serveradmin"><!--?lit$986794476$-->serveradmin</div>
+            </div>
+            <div class="section-tag-body">
+              <slot name="tag--serveradmin"></slot>
+              <div class="regular-font regular-font-size m-markdown" style="padding-bottom:12px">
+                <!--?lit$986794476$--><p>Secured Admin-only calls</p>
+
+              </div>
+              <!--?lit$986794476$--><!---->
+                <section part="section-endpoint" id="get-/action/help_show" class="m-endpoint regular-font get collapsed">
+                  <!--?lit$986794476$-->
+  <summary part="section-endpoint-head-collapsed" class="endpoint-head get  collapsed">
+    <div part="section-endpoint-head-method" class="method get "> <!--?lit$986794476$-->get </div> 
+    <div part="section-endpoint-head-path" class="path "> 
+      <!--?lit$986794476$-->/action/help_show 
+      <!--?lit$986794476$-->
+    </div>
+    <!--?lit$986794476$-->
+    <!--?lit$986794476$-->
+        <div class="only-large-screen" style="min-width:60px; flex:1"></div>
+        <div part="section-endpoint-head-description" class="descr"><!--?lit$986794476$-->Return the help string for a particular API action.
+ </div>
+  </summary>
+        
+                  <!--?lit$986794476$-->
+                </section><!---->
+            </div>
+          </div>
+        
+  <!----><!--?-->
+                    
+                  </div>
+                <!--?-->
+        </div>
+        <slot name="footer"></slot>
+      </main>
+    </div>  
+  </template></rapi-doc></div></div><footer class="theme-doc-footer docusaurus-mt-lg"><div class="row margin-top--sm theme-doc-footer-edit-meta-row"><div class="col"><a href="https://gitlab.opencode.de/-/ide/project/fitko/govdata/docs/edit/main/-/docs/developer/spec-ckan.mdx" target="_blank" rel="noopener noreferrer" class="theme-edit-this-page"><svg fill="currentColor" height="20" width="20" viewBox="0 0 40 40" class="iconEdit_Z9Sw" aria-hidden="true"><g><path d="m34.5 11.7l-3 3.1-6.3-6.3 3.1-3q0.5-0.5 1.2-0.5t1.1 0.5l3.9 3.9q0.5 0.4 0.5 1.1t-0.5 1.2z m-29.5 17.1l18.4-18.5 6.3 6.3-18.4 18.4h-6.3v-6.2z"></path></g></svg>Diese Seite bearbeiten</a></div><div class="col lastUpdated_JAkA"></div></div></footer></article><nav class="docusaurus-mt-lg pagination-nav" aria-label="Dokumentation Seiten"><a class="pagination-nav__link pagination-nav__link--prev" href="https://docs.fitko.de/govdata/docs/developer/introduction"><div class="pagination-nav__sublabel">Zurück</div><div class="pagination-nav__label">Entwickelnde</div></a><a class="pagination-nav__link pagination-nav__link--next" href="https://docs.fitko.de/govdata/docs/developer/sparql-editor"><div class="pagination-nav__sublabel">Weiter</div><div class="pagination-nav__label">SPARQL-Editor</div></a></nav></div></div></div></div></main></div></div></div><footer class="theme-layout-footer footer"><div class="container container-fluid"><div class="footer__bottom text--center"><div class="footer__copyright">Diese Seite ist Teil des <a href="https://docs.fitko.de/">Föderalen Entwicklungsportals</a>. Verantwortlich für die Inhalte der Seite sind die jeweiligen Autoren. Wenn nicht anders vermerkt, sind die Inhalte dieser Webseite lizenziert unter der <a href="https://creativecommons.org/licenses/by/4.0/deed.de">Creative Commons Namensnennung 4.0 International Public License (CC BY 4.0)</a>. Die technische Infrastruktur wird betrieben durch die FITKO. Es gilt das <a href="https://www.fitko.de/impressum">Impressum der FITKO</a> und die <a href="https://docs.fitko.de/meta/privacy">Datenschutzerklärung des Föderalen Entwicklungsportals</a>. <a href="https://plausible.io/docs.fitko.de?f=contains,page,/govdata/">Hier finden Sie unsere Nutzungsstatistiken.</a></div></div></div></footer></main></div>
+
+</body></html>
