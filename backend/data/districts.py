@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import requests
 
 from .database import Database
-from .models import DataSource, District, MUNICH_DATA_SOURCE
+from .models import DataSource, District, MUNICH_DATA_SOURCE, GOVDATA_DATA_SOURCE
 from .parsers import CoordinateTransformer, DataParser
 
 logger = logging.getLogger(__name__)
@@ -37,6 +37,8 @@ class DistrictService:
 
         if source.id == 'munich':
             return self._ingest_munich_districts(source)
+        elif source.id == 'govdata':
+            return self._ingest_govdata_districts(source)
         else:
             logger.warning(f"No district ingestion handler for source: {source.id}")
             return 0
@@ -144,6 +146,42 @@ class DistrictService:
         except Exception as e:
             logger.error(f"Error ingesting Munich districts: {e}")
             raise
+
+    def _ingest_govdata_districts(self, source: DataSource) -> int:
+        """Ingest GovData districts - for now, create a placeholder for Bavaria/Munich region"""
+        logger.info("GovData covers national level - creating placeholder district for Bavaria/Munich region")
+        
+        # Create a single large district covering the Bavaria/Munich region
+        # This is a simplified approach - in production you might want to import actual Bavarian administrative boundaries
+        districts = [District(
+            id=f"{source.id}_bavaria",
+            source_id=source.id,
+            number="00",
+            name="Bayern/München Region",
+            geometry={
+                "type": "Polygon",
+                "coordinates": [[
+                    [8.9, 47.3],  # Southwest corner of Bavaria
+                    [13.8, 47.3], # Southeast corner  
+                    [13.8, 50.6], # Northeast corner
+                    [8.9, 50.6],  # Northwest corner
+                    [8.9, 47.3]   # Close polygon
+                ]]
+            },
+            centroid_lat=49.0,  # Approximate center of Bavaria
+            centroid_lon=11.0,
+            area_sqm=70550.0 * 1000000,  # Bavaria is ~70,550 km²
+            properties={
+                "source": "govdata_placeholder",
+                "description": "Placeholder region covering Bavaria for GovData datasets"
+            }
+        )]
+        
+        # Save to database
+        self.db.upsert_districts_batch(districts)
+        logger.info(f"Created {len(districts)} placeholder district(s) for GovData")
+        
+        return len(districts)
 
     def _calculate_centroid(self, geometry: Dict[str, Any]) -> Tuple[Optional[float], Optional[float]]:
         """Calculate centroid of a geometry"""

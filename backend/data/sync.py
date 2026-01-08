@@ -15,7 +15,7 @@ from .database import Database
 from .districts import DistrictService
 from .models import (
     DataSource, Dataset, DatasetResource, Feature, SyncStatus,
-    MUNICH_DATA_SOURCE, DataSourceType
+    MUNICH_DATA_SOURCE, GOVDATA_DATA_SOURCE, DataSourceType
 )
 from .parsers import DataParser, ParseResult
 
@@ -186,7 +186,11 @@ class DataSync:
     def _fetch_catalog(self, source: DataSource) -> List[Dataset]:
         """Fetch all datasets from a source's catalog"""
         if source.source_type == DataSourceType.CKAN:
-            return self._fetch_ckan_catalog(source)
+            datasets = self._fetch_ckan_catalog(source)
+            # Apply filtering for GovData source
+            if source.id == 'govdata':
+                datasets = self._filter_govdata_datasets(datasets, source)
+            return datasets
         else:
             logger.warning(f"Unsupported source type: {source.source_type}")
             return []
@@ -195,6 +199,11 @@ class DataSync:
         """Fetch catalog from CKAN API"""
         datasets = []
 
+        # For GovData, use search API to find relevant datasets more efficiently
+        if source.id == 'govdata':
+            return self._fetch_govdata_search_catalog(source)
+        
+        # For other sources, use traditional package_list approach
         # Get all package IDs
         list_url = f"{source.api_base_url}/package_list"
         response = requests.get(list_url, timeout=30)
@@ -216,6 +225,139 @@ class DataSync:
                 logger.warning(f"Error fetching {pkg_id}: {e}")
 
         return datasets
+
+    def _fetch_govdata_search_catalog(self, source: DataSource) -> List[Dataset]:
+        """Fetch GovData catalog using search API for better performance"""
+        datasets = []
+        location_filters = source.config.get('location_filters', ['munich', 'münchen', 'bayern', 'bavaria'])
+        
+        # Search for each location term
+        all_results = []
+        for term in location_filters:
+            try:
+                search_url = f"{source.api_base_url}/package_search"
+                params = {
+                    'q': term,
+                    'rows': 1000,  # Get up to 1000 results per term
+                    'start': 0
+                }
+                
+                response = requests.get(search_url, params=params, timeout=30)
+                response.raise_for_status()
+                
+                data = response.json()
+                results = data.get('result', {}).get('results', [])
+                all_results.extend(results)
+                
+                self._report_progress(f"Found {len(results)} datasets for term '{term}'")
+                
+            except Exception as e:
+                logger.warning(f"Error searching for '{term}': {e}")
+        
+        # Remove duplicates by ID
+        seen_ids = set()
+        unique_results = []
+        for result in all_results:
+            if result['id'] not in seen_ids:
+                seen_ids.add(result['id'])
+                unique_results.append(result)
+        
+        self._report_progress(f"Processing {len(unique_results)} unique datasets...")
+        
+        # Convert to Dataset objects
+        for i, result in enumerate(unique_results):
+            try:
+                dataset = self._ckan_result_to_dataset(source, result)
+                if dataset:
+                    datasets.append(dataset)
+                    
+                if i % 50 == 0:
+                    self._report_progress(f"Converting datasets...", i, len(unique_results))
+                    
+            except Exception as e:
+                logger.warning(f"Error converting dataset {result.get('id', 'unknown')}: {e}")
+        
+        return datasets
+
+    def _ckan_result_to_dataset(self, source: DataSource, result: Dict) -> Optional[Dataset]:
+        """Convert CKAN search result to Dataset object"""
+        try:
+            # Parse resources
+            resources = []
+            for res in result.get('resources', []):
+                resources.append(DatasetResource(
+                    id=res.get('id', str(uuid.uuid4())),
+                    name=res.get('name', ''),
+                    url=res.get('url', ''),
+                    format=res.get('format', '').upper(),
+                    size=res.get('size'),
+                    last_modified=datetime.fromisoformat(res['last_modified']) if res.get('last_modified') else None,
+                    description=res.get('description')
+                ))
+
+            # Parse tags
+            tags = [t.get('name', '') for t in result.get('tags', [])]
+
+            # Parse groups
+            groups = [g.get('title', '') for g in result.get('groups', [])]
+
+            # Organization
+            org = result.get('organization', {})
+            organization = org.get('title') if org else None
+
+            return Dataset(
+                id=f"{source.id}_{result['id']}",
+                source_id=source.id,
+                external_id=result['id'],
+                title=result.get('title', ''),
+                description=result.get('notes', ''),
+                resources=resources,
+                tags=tags,
+                groups=groups,
+                organization=organization,
+                license=result.get('license_id'),
+                last_modified=datetime.fromisoformat(result['metadata_modified']) if result.get('metadata_modified') else None,
+                metadata={
+                    'frequency': result.get('frequency'),
+                    'temporal_coverage': result.get('temporal_coverage'),
+                    'spatial_uri': result.get('spatial_uri')
+                }
+            )
+
+        except Exception as e:
+            logger.error(f"Error converting CKAN result to dataset: {e}")
+            return None
+
+    def _filter_govdata_datasets(self, datasets: List[Dataset], source: DataSource) -> List[Dataset]:
+        """Filter GovData datasets for Munich/Bayern location and usable formats"""
+        location_filters = source.config.get('location_filters', ['munich', 'münchen', 'bayern', 'bavaria'])
+        filtered_datasets = []
+        
+        for dataset in datasets:
+            # Check if dataset has usable resources (respect existing file format filtering)
+            if not dataset.has_usable_resources():
+                continue
+                
+            # Check location relevance in title, description, tags, and groups
+            text_to_check = ' '.join([
+                dataset.title.lower(),
+                dataset.description.lower() if dataset.description else '',
+                ' '.join(dataset.tags).lower(),
+                ' '.join(dataset.groups).lower(),
+                dataset.organization.lower() if dataset.organization else ''
+            ])
+            
+            # Check if any location filter matches
+            location_match = any(filter_term in text_to_check for filter_term in location_filters)
+            
+            if location_match:
+                filtered_datasets.append(dataset)
+                logger.debug(f"Included GovData dataset: {dataset.title}")
+            else:
+                logger.debug(f"Excluded GovData dataset (no location match): {dataset.title}")
+        
+        logger.info(f"Filtered GovData datasets: {len(filtered_datasets)}/{len(datasets)} remain after location filtering")
+        return filtered_datasets
 
     def _fetch_dataset_metadata(self, source: DataSource, external_id: str) -> Optional[Dataset]:
         """Fetch metadata for a single dataset"""
@@ -432,6 +574,17 @@ def sync_munich(sync_features: bool = True, max_datasets: int = None) -> SyncSta
 def sync_munich_metadata_only(max_datasets: int = None) -> SyncStatus:
     """Sync only metadata (faster)"""
     return sync_munich(sync_features=False, max_datasets=max_datasets)
+
+
+def sync_govdata(sync_features: bool = True, max_datasets: int = None) -> SyncStatus:
+    """Sync GovData.de open data"""
+    sync = DataSync()
+    return sync.sync_source(GOVDATA_DATA_SOURCE, sync_features=sync_features, max_datasets=max_datasets)
+
+
+def sync_govdata_metadata_only(max_datasets: int = None) -> SyncStatus:
+    """Sync only metadata (faster)"""
+    return sync_govdata(sync_features=False, max_datasets=max_datasets)
 
 
 if __name__ == '__main__':

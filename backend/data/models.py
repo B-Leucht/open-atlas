@@ -105,6 +105,25 @@ MUNICH_DATA_SOURCE = DataSource(
     }
 )
 
+GOVDATA_DATA_SOURCE = DataSource(
+    id="govdata",
+    name="govdata_de",
+    display_name="GovData.de",
+    api_base_url="https://www.govdata.de/ckan/api/3/action",
+    source_type=DataSourceType.CKAN,
+    default_crs="EPSG:4326",
+    bounds={
+        'min_lat': 47.9,
+        'max_lat': 48.3,
+        'min_lon': 11.2,
+        'max_lon': 11.9
+    },
+    config={
+        'location_filters': ['munich', 'münchen', 'bayern', 'bavaria'],
+        'spatial_filtering': True
+    }
+)
+
 
 @dataclass
 class District:
