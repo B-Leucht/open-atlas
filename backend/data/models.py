@@ -368,31 +368,110 @@ class Feature:
     def from_geojson(cls, geojson_feature: Dict[str, Any], dataset_id: str, source_id: str, feature_id: str = None) -> 'Feature':
         """Create Feature from GeoJSON feature dict"""
         import uuid
+        import math
 
         geometry = geojson_feature.get('geometry')
         properties = geojson_feature.get('properties', {})
 
-        # Calculate centroid for point geometries
         centroid_lat = None
         centroid_lon = None
         geometry_type = None
 
+        # UTM Zone 32N bounds for Munich (auto-detection)
+        UTM_BOUNDS = {'min_x': 680000, 'max_x': 700000, 'min_y': 5320000, 'max_y': 5350000}
+        WGS84_BOUNDS = {'min_lon': 11.3, 'max_lon': 11.85, 'min_lat': 48.0, 'max_lat': 48.3}
+
+        def is_utm(x, y):
+            return (UTM_BOUNDS['min_x'] < x < UTM_BOUNDS['max_x'] and
+                    UTM_BOUNDS['min_y'] < y < UTM_BOUNDS['max_y'])
+
+        def is_wgs84(lon, lat):
+            return (WGS84_BOUNDS['min_lon'] <= lon <= WGS84_BOUNDS['max_lon'] and
+                    WGS84_BOUNDS['min_lat'] <= lat <= WGS84_BOUNDS['max_lat'])
+
+        def utm32n_to_wgs84(x, y):
+            """Convert UTM Zone 32N to WGS84"""
+            try:
+                k0 = 0.9996
+                a = 6378137.0
+                e = 0.0818192
+                e2 = e * e
+                x = x - 500000
+                M = y / k0
+                mu = M / (a * (1 - e2/4 - 3*e2*e2/64))
+                e1 = (1 - math.sqrt(1-e2)) / (1 + math.sqrt(1-e2))
+                phi1 = mu + (3*e1/2 - 27*e1**3/32) * math.sin(2*mu)
+                phi1 += (21*e1**2/16 - 55*e1**4/32) * math.sin(4*mu)
+                phi1 += (151*e1**3/96) * math.sin(6*mu)
+                N1 = a / math.sqrt(1 - e2 * math.sin(phi1)**2)
+                T1 = math.tan(phi1)**2
+                R1 = a * (1-e2) / (1 - e2*math.sin(phi1)**2)**1.5
+                D = x / (N1 * k0)
+                lat = phi1 - (N1 * math.tan(phi1) / R1) * (D**2/2 - (5 + 3*T1) * D**4/24)
+                lon = (D - (1 + 2*T1) * D**3/6) / math.cos(phi1)
+                return math.degrees(lon) + 9, math.degrees(lat)
+            except:
+                return None, None
+
+        def convert_coord(x, y):
+            """Convert coordinate to WGS84 if needed"""
+            if is_wgs84(x, y):
+                return x, y
+            if is_utm(x, y):
+                return utm32n_to_wgs84(x, y)
+            return None, None
+
+        def extract_all_coords(coords, geom_type):
+            """Extract all coordinate pairs from any geometry type"""
+            all_coords = []
+            if geom_type == 'Point':
+                if len(coords) >= 2:
+                    all_coords.append((coords[0], coords[1]))
+            elif geom_type == 'MultiPoint':
+                for pt in coords:
+                    if len(pt) >= 2:
+                        all_coords.append((pt[0], pt[1]))
+            elif geom_type == 'LineString':
+                for c in coords:
+                    if len(c) >= 2:
+                        all_coords.append((c[0], c[1]))
+            elif geom_type == 'MultiLineString':
+                for line in coords:
+                    for c in line:
+                        if len(c) >= 2:
+                            all_coords.append((c[0], c[1]))
+            elif geom_type == 'Polygon':
+                for ring in coords:
+                    for c in ring:
+                        if len(c) >= 2:
+                            all_coords.append((c[0], c[1]))
+            elif geom_type == 'MultiPolygon':
+                for polygon in coords:
+                    for ring in polygon:
+                        for c in ring:
+                            if len(c) >= 2:
+                                all_coords.append((c[0], c[1]))
+            return all_coords
+
         if geometry:
             geometry_type = geometry.get('type')
-            if geometry_type == 'Point':
-                coords = geometry.get('coordinates', [])
-                if len(coords) >= 2:
-                    centroid_lon, centroid_lat = coords[0], coords[1]
-            elif geometry_type in ['Polygon', 'MultiPolygon']:
-                # Simple centroid approximation (first coordinate)
-                coords = geometry.get('coordinates', [])
-                if coords:
-                    if geometry_type == 'Polygon' and coords[0]:
-                        # Average of polygon exterior ring
-                        ring = coords[0]
-                        if ring:
-                            centroid_lon = sum(c[0] for c in ring) / len(ring)
-                            centroid_lat = sum(c[1] for c in ring) / len(ring)
+            coords = geometry.get('coordinates', [])
+
+            # Extract all coordinates and convert if needed
+            all_coords = extract_all_coords(coords, geometry_type)
+
+            if all_coords:
+                # Convert coordinates and filter valid ones
+                valid_coords = []
+                for x, y in all_coords:
+                    conv_x, conv_y = convert_coord(x, y)
+                    if conv_x is not None and conv_y is not None:
+                        valid_coords.append((conv_x, conv_y))
+
+                # Calculate centroid from valid coordinates
+                if valid_coords:
+                    centroid_lon = sum(c[0] for c in valid_coords) / len(valid_coords)
+                    centroid_lat = sum(c[1] for c in valid_coords) / len(valid_coords)
 
         return cls(
             id=feature_id or str(uuid.uuid4()),
