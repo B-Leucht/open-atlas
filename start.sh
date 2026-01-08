@@ -17,6 +17,48 @@ cleanup() {
 
 trap cleanup SIGINT SIGTERM
 
+# Check and setup backend dependencies
+echo "Checking backend dependencies..."
+cd backend
+
+# Create venv if it doesn't exist
+if [ ! -d "venv" ]; then
+    echo "Creating Python virtual environment..."
+    python3 -m venv venv
+fi
+
+source venv/bin/activate
+
+# Install/update Python dependencies (prefer uv, fall back to pip)
+if command -v uv &> /dev/null; then
+    echo "Installing Python dependencies with uv..."
+    uv pip install -r requirements.txt --quiet
+else
+    echo "Installing Python dependencies with pip..."
+    pip install -r requirements.txt --quiet
+fi
+
+cd ..
+
+# Check and setup frontend dependencies
+echo "Checking frontend dependencies..."
+cd frontend
+
+if [ ! -d "node_modules" ]; then
+    echo "Installing npm dependencies..."
+    npm install
+else
+    # Check if package.json is newer than node_modules
+    if [ "package.json" -nt "node_modules" ]; then
+        echo "Updating npm dependencies..."
+        npm install
+    fi
+fi
+
+cd ..
+
+echo ""
+
 # Check if backend is running
 if lsof -Pi :5001 -sTCP:LISTEN -t >/dev/null ; then
     echo "✓ Backend is already running on port 5001"
