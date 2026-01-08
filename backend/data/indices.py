@@ -233,17 +233,21 @@ class IndexCalculator:
             row = cursor.fetchone()
             if row:
                 self._dataset_id_cache[pattern] = row[0]
+                logger.debug(f"Resolved pattern '{pattern}' to dataset ID '{row[0]}' (exact ID match)")
                 return row[0]
 
             # Then try title pattern match (for presets)
             cursor = conn.execute(
-                "SELECT id FROM datasets WHERE title LIKE ? AND feature_count > 0 LIMIT 1",
+                "SELECT id, title FROM datasets WHERE title LIKE ? AND feature_count > 0 LIMIT 1",
                 (f"%{pattern}%",)
             )
             row = cursor.fetchone()
             if row:
                 self._dataset_id_cache[pattern] = row[0]
+                logger.debug(f"Resolved pattern '{pattern}' to dataset ID '{row[0]}' (title: '{row[1]}')")
                 return row[0]
+
+            logger.warning(f"Could not resolve pattern '{pattern}' to any dataset")
         return None
 
     def get_presets(self) -> List[Dict[str, Any]]:
@@ -377,15 +381,20 @@ class IndexCalculator:
 
         with self.db.get_connection() as conn:
             # Get population from Bevölkerungsanteil dataset (has absolute numbers in Basiswert.1)
+            # Use Raumbezug to extract district number since _district_number may not be set
             cursor = conn.execute("""
                 SELECT
-                    json_extract(f.properties, '$._district_number') as district_num,
+                    COALESCE(
+                        json_extract(f.properties, '$._district_number'),
+                        SUBSTR(json_extract(f.properties, '$.Raumbezug'), 1, 2)
+                    ) as district_num,
                     json_extract(f.properties, '$."Basiswert.1"') as population
                 FROM features f
                 JOIN datasets d ON f.dataset_id = d.id
                 WHERE d.title LIKE '%Bevölkerung - Bevölkerungsanteil%'
                 AND json_extract(f.properties, '$.Jahr') = '2024'
                 AND json_extract(f.properties, '$.Ausprägung') = 'insgesamt'
+                AND json_extract(f.properties, '$.Raumbezug') != 'Stadt München'
             """)
 
             for row in cursor.fetchall():
@@ -395,11 +404,15 @@ class IndexCalculator:
                     except (ValueError, TypeError):
                         pass
 
+            logger.info(f"Loaded population data for {len(self._population_cache)} districts, sample: {dict(list(self._population_cache.items())[:3])}")
+
             # Get area from districts table
             cursor = conn.execute("SELECT number, area_sqm FROM districts")
             for row in cursor.fetchall():
                 if row[1]:
                     self._area_cache[row[0]] = row[1] / 1_000_000  # Convert to km²
+
+            logger.info(f"Loaded area data for {len(self._area_cache)} districts, sample: {dict(list(self._area_cache.items())[:3])}")
 
     def _calculate_raw_component(
         self,
@@ -414,22 +427,45 @@ class IndexCalculator:
 
         with self.db.get_connection() as conn:
             if comp.column is None or comp.aggregation == "count":
+                # Count features per district - try district_id first, fall back to Raumbezug
                 cursor = conn.execute("""
-                    SELECT d.number, COUNT(f.id) as value
-                    FROM districts d
-                    LEFT JOIN features f ON f.district_id = d.id AND f.dataset_id = ?
-                    GROUP BY d.number
+                    SELECT
+                        COALESCE(
+                            d.number,
+                            SUBSTR(json_extract(f.properties, '$.Raumbezug'), 1, 2)
+                        ) as district_num,
+                        COUNT(f.id) as value
+                    FROM features f
+                    LEFT JOIN districts d ON f.district_id = d.id
+                    WHERE f.dataset_id = ?
+                    AND (
+                        f.district_id IS NOT NULL
+                        OR (json_extract(f.properties, '$.Raumbezug') IS NOT NULL
+                            AND json_extract(f.properties, '$.Raumbezug') != 'Stadt München')
+                    )
+                    GROUP BY district_num
+                    HAVING district_num IS NOT NULL AND district_num != ''
                 """, (dataset_id,))
             else:
                 year_filter = f"AND json_extract(f.properties, '$.Jahr') = '{year}'" if year else ""
                 agg_func = {"sum": "SUM", "avg": "AVG", "min": "MIN", "max": "MAX"}.get(comp.aggregation, "AVG")
+                # Extract district number from Raumbezug (first 2 chars) or _district_number
                 cursor = conn.execute(f"""
-                    SELECT json_extract(f.properties, '$._district_number') as district_num,
-                           {agg_func}(CAST(json_extract(f.properties, '$."{comp.column}"') AS REAL)) as value
+                    SELECT
+                        COALESCE(
+                            json_extract(f.properties, '$._district_number'),
+                            SUBSTR(json_extract(f.properties, '$.Raumbezug'), 1, 2)
+                        ) as district_num,
+                        {agg_func}(CAST(json_extract(f.properties, '$."{comp.column}"') AS REAL)) as value
                     FROM features f
                     WHERE f.dataset_id = ? {year_filter}
-                    AND json_extract(f.properties, '$._district_number') IS NOT NULL
+                    AND (
+                        json_extract(f.properties, '$._district_number') IS NOT NULL
+                        OR (json_extract(f.properties, '$.Raumbezug') IS NOT NULL
+                            AND json_extract(f.properties, '$.Raumbezug') != 'Stadt München')
+                    )
                     GROUP BY district_num
+                    HAVING district_num IS NOT NULL AND district_num != ''
                 """, (dataset_id,))
 
             raw_counts = {row[0]: float(row[1]) for row in cursor.fetchall() if row[0] and row[1] is not None}
@@ -470,23 +506,36 @@ class IndexCalculator:
         # Resolve dataset pattern to ID
         dataset_id = self._resolve_dataset_id(comp.dataset_pattern)
         if not dataset_id:
-            logger.warning(f"Could not find dataset matching: {comp.dataset_pattern}")
+            logger.warning(f"Could not find dataset matching pattern: '{comp.dataset_pattern}'")
             return {}
+
+        logger.info(f"Calculating component '{comp.label}' using dataset '{dataset_id}'")
 
         with self.db.get_connection() as conn:
             # Build query based on whether it's a count or value aggregation
             if comp.column is None or comp.aggregation == "count":
-                # Count features per district
+                # Count features per district - try district_id first, fall back to Raumbezug
                 cursor = conn.execute("""
                     SELECT
-                        d.number,
+                        COALESCE(
+                            d.number,
+                            SUBSTR(json_extract(f.properties, '$.Raumbezug'), 1, 2)
+                        ) as district_num,
                         COUNT(f.id) as value
-                    FROM districts d
-                    LEFT JOIN features f ON f.district_id = d.id AND f.dataset_id = ?
-                    GROUP BY d.number
+                    FROM features f
+                    LEFT JOIN districts d ON f.district_id = d.id
+                    WHERE f.dataset_id = ?
+                    AND (
+                        f.district_id IS NOT NULL
+                        OR (json_extract(f.properties, '$.Raumbezug') IS NOT NULL
+                            AND json_extract(f.properties, '$.Raumbezug') != 'Stadt München')
+                    )
+                    GROUP BY district_num
+                    HAVING district_num IS NOT NULL AND district_num != ''
                 """, (dataset_id,))
             else:
                 # Aggregate a specific column (for Indikatorenatlas data)
+                # These use "Raumbezug" field like "01 Altstadt - Lehel" for district
                 year_filter = f"AND json_extract(f.properties, '$.Jahr') = '{year}'" if year else ""
 
                 agg_func = {
@@ -496,15 +545,24 @@ class IndexCalculator:
                     "max": "MAX"
                 }.get(comp.aggregation, "AVG")
 
+                # Extract district number from Raumbezug (first 2 chars) or _district_number
                 cursor = conn.execute(f"""
                     SELECT
-                        json_extract(f.properties, '$._district_number') as district_num,
+                        COALESCE(
+                            json_extract(f.properties, '$._district_number'),
+                            SUBSTR(json_extract(f.properties, '$.Raumbezug'), 1, 2)
+                        ) as district_num,
                         {agg_func}(CAST(json_extract(f.properties, '$."{comp.column}"') AS REAL)) as value
                     FROM features f
                     WHERE f.dataset_id = ?
                     {year_filter}
-                    AND json_extract(f.properties, '$._district_number') IS NOT NULL
+                    AND (
+                        json_extract(f.properties, '$._district_number') IS NOT NULL
+                        OR (json_extract(f.properties, '$.Raumbezug') IS NOT NULL
+                            AND json_extract(f.properties, '$.Raumbezug') != 'Stadt München')
+                    )
                     GROUP BY district_num
+                    HAVING district_num IS NOT NULL AND district_num != ''
                 """, (dataset_id,))
 
             raw_values = {}
@@ -512,8 +570,12 @@ class IndexCalculator:
                 if row[0] and row[1] is not None:
                     raw_values[row[0]] = float(row[1])
 
+        logger.info(f"Component '{comp.label}': raw values from {len(raw_values)} districts, sample: {dict(list(raw_values.items())[:3])}")
+
         # Apply normalization
         normalized = self._normalize_values(raw_values, comp.normalize, districts)
+
+        logger.info(f"Component '{comp.label}': after normalization, sample: {dict(list(normalized.items())[:3])}")
 
         return normalized
 

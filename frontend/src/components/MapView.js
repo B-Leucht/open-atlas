@@ -38,14 +38,40 @@ proj4.defs([
 
 const convertCoordinates = (coords) => {
   try {
-    // Check if coordinates are in projected system (UTM)
-    if (coords[0] > 180 || coords[0] < -180) {
+    if (!coords || coords.length < 2) return null;
+
+    const x = coords[0];
+    const y = coords[1];
+
+    // Check if coordinates are in projected system (UTM) - values in hundreds of thousands
+    if (x > 180 || x < -180) {
       // Convert from EPSG:25832 (UTM) to EPSG:4326 (lat/lon)
       const [lon, lat] = proj4('EPSG:25832', 'EPSG:4326', coords);
-      return [lat, lon];
+      return [lat, lon]; // Leaflet expects [lat, lon]
     } else {
-      // Already in lat/lon, just swap if needed
-      return coords[1] > coords[0] ? [coords[1], coords[0]] : coords;
+      // Already in WGS84 (lon/lat or lat/lon)
+      // GeoJSON standard is [longitude, latitude]
+      // Leaflet expects [latitude, longitude]
+      // For Munich: lat ~48, lon ~11
+      // If first coord is around 11 (lon) and second around 48 (lat), it's GeoJSON order
+      // If first coord is around 48 (lat) and second around 11 (lon), it's already Leaflet order
+
+      // Check if it looks like Munich coordinates
+      const isMunichArea = (x > 10 && x < 13 && y > 47 && y < 49) ||
+                           (y > 10 && y < 13 && x > 47 && x < 49);
+
+      if (!isMunichArea) {
+        // Not Munich area, assume GeoJSON [lon, lat] order
+        return [y, x];
+      }
+
+      // For Munich: if x is smaller (around 11), it's longitude (GeoJSON order)
+      // Need to swap to get [lat, lon] for Leaflet
+      if (x < y) {
+        return [y, x]; // x was lon, y was lat -> return [lat, lon]
+      } else {
+        return [x, y]; // Already in [lat, lon] order
+      }
     }
   } catch (error) {
     console.error('Coordinate conversion error:', error, coords);

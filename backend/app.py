@@ -1,6 +1,16 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 import threading
+import logging
+from typing import List, Dict, Any, Optional
+from functools import lru_cache
+from datetime import datetime
+
+# Configure logging to show INFO level messages
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 
 app = Flask(__name__)
 CORS(app)
@@ -33,13 +43,32 @@ def get_data_sync():
 
 # Chat agent (lazy loading)
 _chat_agent = None
+_vector_store = None
+
+def get_vector_store():
+    """Get vector store, auto-sync from database if empty"""
+    global _vector_store
+    if _vector_store is None:
+        from chat.vector_store import VectorStore
+        _vector_store = VectorStore()
+
+        # Auto-sync if collection is empty
+        try:
+            collection = _vector_store.get_collection()
+            if collection.count() == 0:
+                logging.info("Vector store is empty, syncing from database...")
+                count = _vector_store.sync_from_database(get_db())
+                logging.info(f"Synced {count} datasets to vector store")
+        except Exception as e:
+            logging.warning(f"Could not auto-sync vector store: {e}")
+
+    return _vector_store
 
 def get_chat_agent():
     global _chat_agent
     if _chat_agent is None:
         from chat.agent import ChatAgent
-        from chat.vector_store import VectorStore
-        _chat_agent = ChatAgent(db=get_db(), vector_store=VectorStore())
+        _chat_agent = ChatAgent(db=get_db(), vector_store=get_vector_store())
     return _chat_agent
 
 # ============================================================================
@@ -629,6 +658,12 @@ def chat():
     """
     Send a natural language query to the AI agent.
     The agent finds relevant datasets and analyzes them.
+
+    Returns structured response including:
+    - answer: The text response
+    - query_type: "single_dataset", "multi_dataset", or "index_creation"
+    - index_result: Full index data (if index_creation query)
+    - geo_data: Geographic data for map display (if available)
     """
     try:
         data = request.get_json()
@@ -640,13 +675,26 @@ def chat():
             return jsonify({'success': False, 'error': 'Query cannot be empty'}), 400
 
         agent = get_chat_agent()
-        answer = agent.query(query)
+        result = agent.query(query)
 
-        return jsonify({
+        # Build response with structured data
+        response = {
             'success': True,
             'query': query,
-            'answer': answer
-        })
+            'answer': result.get('answer', ''),
+            'query_type': result.get('query_type', 'single_dataset'),
+        }
+
+        # Include index result if available (for map visualization)
+        if result.get('index_result'):
+            response['index_result'] = result['index_result']
+            response['suggested_index'] = result.get('suggested_index')
+
+        # Include geographic data if available
+        if result.get('geo_data'):
+            response['geo_data'] = result['geo_data']
+
+        return jsonify(response)
 
     except Exception as e:
         print(f"Chat error: {e}")

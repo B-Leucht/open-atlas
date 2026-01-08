@@ -243,7 +243,7 @@ function App() {
     }
   };
 
-  const applyIndexResult = (data) => {
+  const applyIndexResult = (data, suggestedIndex) => {
     setIndexResult(data);
 
     const mapData = {};
@@ -261,9 +261,69 @@ function App() {
       data: mapData,
       min: data.stats.min,
       max: data.stats.max,
-      label: data.name,
+      label: data.name || suggestedIndex?.name || 'Chat Index',
     });
+
+    // Clear any preset selection since this came from chat
+    setSelectedPreset(null);
   };
+
+  // Handle geographic data from chatbot
+  const handleChatGeoData = useCallback((geoData) => {
+    if (!geoData || !geoData.coordinates || !Array.isArray(geoData.coordinates)) {
+      console.log('No valid geo_data received:', geoData);
+      return;
+    }
+
+    console.log('Processing geo_data:', geoData.coordinates.length, 'coordinates');
+
+    // Convert chat geo data to map features format
+    // Coordinates come as {lat, lon} from the backend
+    const features = geoData.coordinates
+      .filter(coord => {
+        // Validate coordinates
+        const lat = coord.lat || coord.latitude;
+        const lon = coord.lon || coord.longitude;
+        const valid = typeof lat === 'number' && typeof lon === 'number' &&
+                      !isNaN(lat) && !isNaN(lon) &&
+                      lat >= -90 && lat <= 90 &&
+                      lon >= -180 && lon <= 180;
+        if (!valid) {
+          console.log('Invalid coordinate:', coord);
+        }
+        return valid;
+      })
+      .map((coord, idx) => ({
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          // GeoJSON uses [longitude, latitude] order
+          coordinates: [coord.lon || coord.longitude, coord.lat || coord.latitude]
+        },
+        properties: {
+          name: coord.name || `Point ${idx + 1}`,
+          ...(coord.properties || {})
+        },
+        category: 'chat-result'
+      }));
+
+    console.log('Created', features.length, 'valid features');
+
+    if (features.length > 0) {
+      setMapFeatures(features);
+      setDatasetMetadata({
+        'chat-result': {
+          title: geoData.dataset_title || 'Chat Results',
+          weight: 1
+        }
+      });
+
+      // Clear any district-based visualization to show only points
+      setDistrictData(null);
+      setIndexResult(null);
+      setSelectedPreset(null);
+    }
+  }, []);
 
   const clearIndex = () => {
     setSelectedPreset(null);
@@ -550,7 +610,10 @@ function App() {
           districtData={showOverlay ? districtData : null}
           onDistrictClick={indexResult ? handleDistrictClick : null}
         />
-        <Chatbot />
+        <Chatbot
+          onIndexResult={applyIndexResult}
+          onGeoData={handleChatGeoData}
+        />
       </div>
     </div>
   );
