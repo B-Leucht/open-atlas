@@ -319,8 +319,18 @@ class IndexCalculator:
         component_values: List[Dict[str, float]] = []
         raw_component_values: List[Dict[str, float]] = []  # Pre-normalization values
         component_info: List[Dict[str, Any]] = []
+        skipped_components: List[Dict[str, Any]] = []
 
         for comp in components:
+            dataset_id = self._resolve_dataset_id(comp.dataset_pattern)
+            if not dataset_id:
+                skipped_components.append({
+                    "label": comp.label or comp.dataset_pattern,
+                    "reason": "Dataset not found"
+                })
+                logger.warning(f"Skipping component '{comp.label}': dataset '{comp.dataset_pattern}' not found")
+                continue
+
             values = self._calculate_component(comp, districts, year)
             if values:
                 component_values.append(values)
@@ -328,8 +338,6 @@ class IndexCalculator:
                 # Note: _calculate_component already applies normalization, so we need raw counts
                 raw_values = self._calculate_raw_component(comp, districts, year)
                 raw_component_values.append(raw_values)
-                # Get the resolved dataset ID for this component
-                dataset_id = self._resolve_dataset_id(comp.dataset_pattern)
                 component_info.append({
                     "label": comp.label or comp.dataset_pattern,
                     "weight": comp.weight,
@@ -338,6 +346,12 @@ class IndexCalculator:
                     "districts_with_data": len([v for v in values.values() if v > 0]),
                     "dataset_id": dataset_id  # Include dataset ID for fetching features
                 })
+            else:
+                skipped_components.append({
+                    "label": comp.label or comp.dataset_pattern,
+                    "reason": "No district-level data found"
+                })
+                logger.warning(f"Skipping component '{comp.label}': no district-level data for dataset '{dataset_id}'")
 
         if not component_values:
             return {"success": False, "error": "No data available for any component"}
@@ -352,6 +366,7 @@ class IndexCalculator:
             "scores": final_scores,
             "breakdown": breakdown,  # Per-district component values
             "components": component_info,
+            "skipped_components": skipped_components,
             "districts": [
                 {"number": d["number"], "name": d["name"]}
                 for d in districts

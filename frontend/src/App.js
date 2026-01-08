@@ -574,6 +574,17 @@ function App() {
               </label>
             </div>
 
+            {indexResult.skipped_components && indexResult.skipped_components.length > 0 && (
+              <div className="skipped-warning">
+                <strong>{lang === 'de' ? 'Übersprungen:' : 'Skipped:'}</strong>
+                {indexResult.skipped_components.map((s, i) => (
+                  <div key={i} className="skipped-item">
+                    {s.label} <span className="skipped-reason">({s.reason})</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {indexResult.components && indexResult.components.length > 0 && (
               <button className="edit-index-btn" onClick={editCurrentIndex}>
                 {t.editIndex}
