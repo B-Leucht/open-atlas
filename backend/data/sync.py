@@ -93,7 +93,7 @@ class DataSync:
 
             # Step 2: Sync dataset metadata
             self._report_progress(f"Fetching dataset catalog...")
-            datasets = self._fetch_catalog(source)
+            datasets = self._fetch_catalog(source, status)
             status.total_datasets = len(datasets)
 
             if max_datasets:
@@ -107,7 +107,13 @@ class DataSync:
                 status.current_dataset = dataset.title
                 status.synced_datasets = i
                 self.db.update_sync_status(status)
-                self._report_progress(f"Processing: {dataset.title}", i + 1, len(datasets))
+                
+                # More frequent progress reporting
+                progress_msg = f"Processing: {dataset.title}"
+                if i % 5 == 0 or i == len(datasets) - 1:
+                    self._report_progress(progress_msg, i + 1, len(datasets))
+                else:
+                    logger.info(progress_msg)
 
                 try:
                     # Analyze dataset for geo capability
@@ -118,7 +124,7 @@ class DataSync:
 
                     # Sync features if requested (for geo datasets or district-specific datasets)
                     if sync_features and (dataset.has_geometry or dataset.is_district_specific):
-                        feature_count = self._sync_dataset_features(dataset)
+                        feature_count = self._sync_dataset_features(dataset, status)
                         dataset.feature_count = feature_count
                         dataset.last_synced = datetime.utcnow()
                         dataset.sync_status = 'synced'
@@ -183,10 +189,10 @@ class DataSync:
     # Catalog Fetching
     # =========================================================================
 
-    def _fetch_catalog(self, source: DataSource) -> List[Dataset]:
+    def _fetch_catalog(self, source: DataSource, status: SyncStatus = None) -> List[Dataset]:
         """Fetch all datasets from a source's catalog"""
         if source.source_type == DataSourceType.CKAN:
-            datasets = self._fetch_ckan_catalog(source)
+            datasets = self._fetch_ckan_catalog(source, status)
             # Apply filtering for GovData source
             if source.id == 'govdata':
                 datasets = self._filter_govdata_datasets(datasets, source)
@@ -195,7 +201,7 @@ class DataSync:
             logger.warning(f"Unsupported source type: {source.source_type}")
             return []
 
-    def _fetch_ckan_catalog(self, source: DataSource) -> List[Dataset]:
+    def _fetch_ckan_catalog(self, source: DataSource, status: SyncStatus = None) -> List[Dataset]:
         """Fetch catalog from CKAN API"""
         datasets = []
 
@@ -216,6 +222,10 @@ class DataSync:
         for i, pkg_id in enumerate(package_ids):
             if i % 50 == 0:
                 self._report_progress(f"Fetching package metadata...", i, len(package_ids))
+                # Also update sync status during catalog fetch
+                if status:
+                    status.current_dataset = f"Fetching package {i+1}/{len(package_ids)}"
+                    self.db.update_sync_status(status)
 
             try:
                 dataset = self._fetch_dataset_metadata(source, pkg_id)
@@ -466,7 +476,7 @@ class DataSync:
     # Feature Sync
     # =========================================================================
 
-    def _sync_dataset_features(self, dataset: Dataset) -> int:
+    def _sync_dataset_features(self, dataset: Dataset, status: SyncStatus = None) -> int:
         """Sync features for a dataset"""
         # Skip datasets without usable resources
         if not dataset.has_usable_resources():
@@ -516,6 +526,13 @@ class DataSync:
                 batch = features[i:i + batch_size]
                 self.db.upsert_features_batch(batch)
                 total_inserted += len(batch)
+                
+                # Progress update for feature sync
+                if i % (batch_size * 2) == 0 or i + batch_size >= len(features):
+                    self._report_progress(f"Syncing features for {dataset.title}...", total_inserted, len(features))
+                    if status:
+                        status.current_dataset = f"Features: {total_inserted}/{len(features)} for {dataset.title}"
+                        self.db.update_sync_status(status)
 
             logger.info(f"Synced {total_inserted} features for {dataset.title}")
             return total_inserted
@@ -589,28 +606,71 @@ def sync_govdata_metadata_only(max_datasets: int = None) -> SyncStatus:
 
 if __name__ == '__main__':
     import argparse
+    import time
 
     logging.basicConfig(level=logging.INFO)
 
-    parser = argparse.ArgumentParser(description='Sync Munich Open Data')
+    parser = argparse.ArgumentParser(description='Sync Open Data Sources')
+    parser.add_argument('--source', choices=['munich', 'govdata'], default='munich', help='Data source to sync')
     parser.add_argument('--metadata-only', action='store_true', help='Only sync metadata')
     parser.add_argument('--max-datasets', type=int, help='Limit datasets to sync')
     parser.add_argument('--districts-only', action='store_true', help='Only sync districts')
+    parser.add_argument('--no-features', action='store_true', help='Skip feature sync')
 
     args = parser.parse_args()
 
-    if args.districts_only:
-        db = Database()
-        service = DistrictService(db)
-        count = service.ingest_districts(MUNICH_DATA_SOURCE)
-        print(f"Synced {count} districts")
+    # Select data source
+    if args.source == 'munich':
+        source = MUNICH_DATA_SOURCE
+        sync_func = sync_munich
+    elif args.source == 'govdata':
+        # Import here to avoid circular imports if not needed
+        from .models import GOVDATA_DATA_SOURCE
+        source = GOVDATA_DATA_SOURCE
+        sync_func = sync_govdata
     else:
-        status = sync_munich(
-            sync_features=not args.metadata_only,
-            max_datasets=args.max_datasets
-        )
-        print(f"\nSync completed:")
-        print(f"  Status: {status.status}")
-        print(f"  Datasets: {status.synced_datasets}/{status.total_datasets}")
-        print(f"  Features: {status.total_features}")
-        print(f"  Errors: {len(status.errors)}")
+        print(f"Unknown source: {args.source}")
+        exit(1)
+
+    print(f"Starting sync for {source.display_name}...")
+    print(f"Source: {source.api_base_url}")
+    print(f"Metadata only: {args.metadata_only or args.no_features}")
+    if args.max_datasets:
+        print(f"Max datasets: {args.max_datasets}")
+    print("-" * 50)
+
+    try:
+        start_time = time.time()
+        
+        if args.districts_only:
+            db = Database()
+            service = DistrictService(db)
+            count = service.ingest_districts(source)
+            print(f"Synced {count} districts")
+        else:
+            status = sync_func(
+                sync_features=not args.metadata_only and not args.no_features,
+                max_datasets=args.max_datasets
+            )
+            
+            elapsed = time.time() - start_time
+            print(f"\n{'='*50}")
+            print(f"Sync completed in {elapsed:.1f} seconds")
+            print(f"Status: {status.status}")
+            print(f"Datasets: {status.synced_datasets}/{status.total_datasets}")
+            print(f"Features: {status.total_features}")
+            print(f"Failed: {status.failed_datasets}")
+            
+            if status.errors:
+                print(f"\nErrors ({len(status.errors)}):")
+                for i, error in enumerate(status.errors[:5]):
+                    print(f"  {i+1}. {error}")
+                if len(status.errors) > 5:
+                    print(f"  ... and {len(status.errors) - 5} more errors")
+
+    except KeyboardInterrupt:
+        print("\nSync interrupted by user")
+    except Exception as e:
+        print(f"\nSync failed: {e}")
+        import traceback
+        traceback.print_exc()
