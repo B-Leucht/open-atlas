@@ -84,6 +84,9 @@ const AGGREGATION_OPTIONS = (lang) => [
   { value: 'avg', label: TRANSLATIONS[lang].aggregation.avg },
 ];
 
+// Counter for generating unique component IDs
+let componentIdCounter = 0;
+
 function App() {
   // Language
   const [lang, setLang] = useState(() => {
@@ -355,8 +358,9 @@ function App() {
   };
 
   const addComponent = async (dataset) => {
-    // Generate a unique ID for this component (allows same dataset multiple times)
-    const componentId = `${dataset.id}_${Date.now()}_${Math.random()}`;
+    // Generate a unique ID using a counter for better uniqueness
+    componentIdCounter += 1;
+    const componentId = `component_${dataset.id}_${componentIdCounter}`;
     const columns = await loadDatasetColumns(dataset.id);
     setCustomComponents([...customComponents, {
       id: componentId,  // Unique ID for this component instance
@@ -390,7 +394,8 @@ function App() {
       const dataset = availableDatasets.find(d => d.id === comp.dataset_id);
       if (dataset) {
         const columns = await loadDatasetColumns(dataset.id);
-        const componentId = `${dataset.id}_${Date.now()}_${Math.random()}`;
+        componentIdCounter += 1;
+        const componentId = `component_${dataset.id}_${componentIdCounter}`;
         newComponents.push({
           id: componentId,  // Unique ID for this component instance
           dataset,

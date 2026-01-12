@@ -479,37 +479,11 @@ class Database:
 
             # Split query into individual words for better fuzzy matching
             query_words = query.lower().split()
+            query_lower = query.lower()
             
-            # Build fuzzy search conditions for each word
-            # Search in title, description, tags, and groups
-            sql = '''
-                SELECT *,
-                    -- Relevance scoring: title matches are weighted highest
-                    (CASE 
-                        WHEN LOWER(title) = LOWER(?) THEN 100
-                        WHEN LOWER(title) LIKE ? THEN 90
-                        ELSE 0 
-                    END) as title_score,
-                    -- Description matches are weighted lower
-                    (CASE 
-                        WHEN LOWER(description) LIKE ? THEN 50
-                        ELSE 0
-                    END) as desc_score,
-                    -- Tags and groups matches are weighted medium
-                    (CASE 
-                        WHEN LOWER(tags) LIKE ? OR LOWER(groups) LIKE ? THEN 70
-                        ELSE 0
-                    END) as tags_score
-                FROM datasets
-                WHERE (
-            '''
-            
-            # Add conditions for each query word
+            # Build search conditions - each word must match somewhere
             conditions = []
             params = []
-            
-            # Exact and fuzzy title match parameters for scoring
-            params.extend([query, f'%{query}%', f'%{query}%', f'%{query}%', f'%{query}%'])
             
             # Build WHERE conditions for each word
             for word in query_words:
@@ -524,14 +498,42 @@ class Database:
                 # Add parameter for each condition
                 params.extend([f'%{word}%'] * 5)
             
-            sql += ' AND '.join(conditions) + ')'
+            # Build scoring that matches individual words
+            score_parts = []
+            
+            # Score each word match in title (highest weight)
+            for word in query_words:
+                score_parts.append(f"(CASE WHEN LOWER(title) LIKE ? THEN 30 ELSE 0 END)")
+                params.append(f'%{word}%')
+            
+            # Bonus for exact title match
+            score_parts.append(f"(CASE WHEN LOWER(title) = ? THEN 100 ELSE 0 END)")
+            params.append(query_lower)
+            
+            # Score each word match in description (medium weight)
+            for word in query_words:
+                score_parts.append(f"(CASE WHEN LOWER(description) LIKE ? THEN 15 ELSE 0 END)")
+                params.append(f'%{word}%')
+            
+            # Score each word match in tags/groups (high weight)
+            for word in query_words:
+                score_parts.append(f"(CASE WHEN LOWER(tags) LIKE ? OR LOWER(groups) LIKE ? THEN 25 ELSE 0 END)")
+                params.extend([f'%{word}%', f'%{word}%'])
+            
+            relevance_score = ' + '.join(score_parts)
+            
+            sql = f'''
+                SELECT *, ({relevance_score}) as relevance_score
+                FROM datasets
+                WHERE ({' AND '.join(conditions)})
+            '''
 
             if source_id:
                 sql += ' AND source_id = ?'
                 params.append(source_id)
 
-            # Order by relevance score (sum of all scores), then by title
-            sql += ' ORDER BY (title_score + desc_score + tags_score) DESC, title LIMIT ?'
+            # Order by relevance score, then by title
+            sql += ' ORDER BY relevance_score DESC, title LIMIT ?'
             params.append(limit)
 
             cursor.execute(sql, params)
@@ -571,10 +573,13 @@ class Database:
                         categories[group] = []
                     categories[group].append(dataset_id)
                 
-                # Add common/meaningful tags as categories
+                # Add meaningful tags as categories
+                # Filter out generic/common tags that don't add value
+                # This list is specific to Munich open data portal and can be customized
+                generic_tags = {'data', 'open', 'stadt', 'muenchen', 'munich'}
                 for tag in tags:
-                    # Only include meaningful tags (not too generic)
-                    if len(tag) > 3 and tag.lower() not in ['data', 'open', 'stadt']:
+                    # Only include meaningful tags (not too short, not too generic)
+                    if len(tag) > 3 and tag.lower() not in generic_tags:
                         if tag not in categories:
                             categories[tag] = []
                         categories[tag].append(dataset_id)
