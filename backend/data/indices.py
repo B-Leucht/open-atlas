@@ -322,6 +322,9 @@ class IndexCalculator:
         component_info: List[Dict[str, Any]] = []
         skipped_components: List[Dict[str, Any]] = []
 
+        # Map to store dataset descriptions for breakdown
+        component_descriptions: Dict[str, Optional[str]] = {}
+
         for comp in components:
             dataset_id = self._resolve_dataset_id(comp.dataset_pattern)
             if not dataset_id:
@@ -332,10 +335,14 @@ class IndexCalculator:
                 logger.warning(f"Skipping component '{comp.label}': dataset '{comp.dataset_pattern}' not found")
                 continue
 
+            # Get dataset description
+            description = self._get_dataset_description(dataset_id)
+
             values = self._calculate_component(comp, districts, year)
             if values:
                 component_values.append(values)
                 successful_components.append(comp)
+                component_descriptions[comp.label or comp.dataset_pattern] = description
                 # Store raw values before any district-level normalization was applied
                 # Note: _calculate_component already applies normalization, so we need raw counts
                 raw_values = self._calculate_raw_component(comp, districts, year)
@@ -359,7 +366,7 @@ class IndexCalculator:
             return {"success": False, "error": "No data available for any component"}
 
         # Combine components into final scores with breakdown
-        final_scores, breakdown = self._combine_components_with_breakdown(successful_components, component_values, raw_component_values, districts)
+        final_scores, breakdown = self._combine_components_with_breakdown(successful_components, component_values, raw_component_values, districts, component_descriptions)
 
         # Build response
         return {
@@ -656,12 +663,23 @@ class IndexCalculator:
 
         return values
 
+    def _get_dataset_description(self, dataset_id: str) -> Optional[str]:
+        """Get description for a dataset"""
+        with self.db.get_connection() as conn:
+            cursor = conn.execute(
+                "SELECT description FROM datasets WHERE id = ?",
+                (dataset_id,)
+            )
+            row = cursor.fetchone()
+            return row[0] if row else None
+
     def _combine_components_with_breakdown(
         self,
         components: List[IndexComponent],
         component_values: List[Dict[str, float]],
         raw_values: List[Dict[str, float]],
-        districts: List[Dict[str, Any]]
+        districts: List[Dict[str, Any]],
+        descriptions: Optional[Dict[str, str]] = None
     ) -> Tuple[Dict[str, float], Dict[str, List[Dict[str, Any]]]]:
         """Combine multiple components into a final score with per-district breakdown"""
         district_nums = [d["number"] for d in districts]
@@ -711,8 +729,10 @@ class IndexCalculator:
                     raw_count = raw_data.get("count", 0)
                     raw_denominator = raw_data.get("denominator")
 
+                    label = comp.label or comp.dataset_pattern
                     district_breakdown.append({
-                        "label": comp.label or comp.dataset_pattern,
+                        "label": label,
+                        "description": descriptions.get(label) if descriptions else None,
                         "value": round(raw_value, 1),
                         "count": round(raw_count),
                         "denominator": round(raw_denominator, 1) if raw_denominator else None,
