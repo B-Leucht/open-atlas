@@ -759,16 +759,16 @@ def design_index(
             "reasoning": str
         }
     """
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.2)
+    llm = ChatOpenAI(model="gpt-5-mini", temperature=0.2)
 
     # Filter to datasets that actually have features and are useful for indices
     useful_datasets = [d for d in available_datasets if d.get('feature_count', 0) > 0]
     logger.info(f"design_index: {len(useful_datasets)} datasets with features (from {len(available_datasets)} total)")
 
-    # Format available datasets for the prompt
+    # Format all available datasets for the prompt (no limit - modern LLMs can handle it)
     dataset_list = "\n".join([
         f"- {d['title']} (ID: {d['id']}, {d['feature_count']} features)"
-        for d in useful_datasets[:50]  # Limit to avoid token overflow
+        for d in useful_datasets
     ])
 
     system_msg = AIMessage(content="""You design composite indices for ranking Munich districts.
