@@ -773,7 +773,7 @@ def design_index(
 
     system_msg = AIMessage(content="""You design composite indices for ranking Munich districts.
 
-TASK: Create an index that answers the user's question by combining 3-6 relevant datasets.
+TASK: Create an index that answers the user's question by combining 3-10 relevant datasets.
 
 OUTPUT FORMAT (JSON only):
 {
