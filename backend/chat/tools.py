@@ -243,7 +243,7 @@ def select_best_resource(resources: List[Dict[str, Any]]) -> Optional[Dict[str, 
 def generate_sql(user_query: str, columns: List[str], preview_md: str,
                  table_name: str, spatial: bool = False) -> str:
     """Generate SQL query using LLM"""
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.1)
+    llm = ChatOpenAI(model="gpt-5-mini", temperature=0.1)
 
     spatial_hint = ""
     if spatial:
@@ -518,7 +518,7 @@ def classify_query(user_query: str) -> Dict[str, Any]:
             "confidence": float
         }
     """
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.0)
+    llm = ChatOpenAI(model="gpt-5-mini", temperature=0.0)
 
     system_msg = AIMessage(content="""You classify user queries about Munich open data into exactly ONE category.
 
@@ -667,7 +667,7 @@ def analyze_multiple_datasets(
 
 def _synthesize_multi_results(results: List[Dict[str, Any]], user_query: str) -> str:
     """Use LLM to synthesize insights from multiple dataset analyses"""
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.1)
+    llm = ChatOpenAI(model="gpt-5-mini", temperature=0.1)
 
     # Build context from results
     results_text = ""
