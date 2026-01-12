@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import axios from 'axios';
 import MapView from './components/MapView';
 import Chatbot from './components/Chatbot';
@@ -111,6 +111,8 @@ function App() {
   const [availableDatasets, setAvailableDatasets] = useState([]);
   const [customComponents, setCustomComponents] = useState([]);
   const [datasetSearch, setDatasetSearch] = useState('');
+  const [searchResults, setSearchResults] = useState(null);
+  const [selectedCategory, setSelectedCategory] = useState(null);
 
   // District selection
   const [selectedDistrict, setSelectedDistrict] = useState(null);
@@ -124,6 +126,34 @@ function App() {
     loadPresets();
     loadAvailableDatasets();
   }, []);
+
+  // Semantic search with debounce
+  useEffect(() => {
+    if (!datasetSearch.trim()) {
+      setSearchResults(null);
+      return;
+    }
+
+    const timeoutId = setTimeout(async () => {
+      try {
+        const response = await axios.get(`${API_URL}/v2/datasets/search`, {
+          params: { q: datasetSearch, limit: 50 }
+        });
+        if (response.data.success) {
+          // Filter to only district-specific or geometric datasets
+          const useful = response.data.datasets.filter(d =>
+            d.is_district_specific || d.has_geometry
+          );
+          setSearchResults(useful);
+        }
+      } catch (error) {
+        console.error('Search error:', error);
+        setSearchResults([]);
+      }
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [datasetSearch]);
 
   const loadPresets = async () => {
     try {
@@ -406,10 +436,45 @@ function App() {
     }
   };
 
-  const filteredDatasets = availableDatasets.filter(d =>
-    d.title.toLowerCase().includes(datasetSearch.toLowerCase()) &&
-    !customComponents.find(c => c.dataset.id === d.id)
-  ).slice(0, 8);
+  // Use semantic search results if available, otherwise filter by category
+  const filteredDatasets = useMemo(() => {
+    let datasets = searchResults !== null ? searchResults : availableDatasets;
+
+    // Filter to useful datasets only
+    datasets = datasets.filter(d => d.is_district_specific || d.has_geometry);
+
+    // Filter by selected category
+    if (selectedCategory) {
+      datasets = datasets.filter(d =>
+        d.groups && d.groups.includes(selectedCategory)
+      );
+    }
+
+    // Exclude already added components
+    datasets = datasets.filter(d => !customComponents.find(c => c.dataset.id === d.id));
+
+    return datasets.slice(0, 15);
+  }, [searchResults, availableDatasets, selectedCategory, customComponents]);
+
+  // Get categories with counts (only from useful datasets)
+  const categories = useMemo(() => {
+    const counts = {};
+
+    availableDatasets
+      .filter(ds => ds.is_district_specific || ds.has_geometry)
+      .forEach(ds => {
+        if (ds.groups && ds.groups.length > 0) {
+          ds.groups.forEach(group => {
+            counts[group] = (counts[group] || 0) + 1;
+          });
+        }
+      });
+
+    // Sort by count descending
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, count]) => ({ name, count }));
+  }, [availableDatasets]);
 
   return (
     <div className="app">
@@ -458,19 +523,41 @@ function App() {
                 value={datasetSearch}
                 onChange={(e) => setDatasetSearch(e.target.value)}
               />
-              {datasetSearch && filteredDatasets.length > 0 && (
-                <div className="dataset-dropdown">
-                  {filteredDatasets.map(d => (
-                    <div key={d.id} className="dataset-option" onClick={() => addComponent(d)}>
-                      <span className="dataset-title">{d.title}</span>
-                      {d.description && (
-                        <Tooltip text={d.description}>
-                          <span className="info-icon">ⓘ</span>
-                        </Tooltip>
-                      )}
-                    </div>
-                  ))}
+            </div>
+
+            {/* Category Filter Chips */}
+            <div className="category-chips">
+              <button
+                className={`category-chip ${!selectedCategory ? 'active' : ''}`}
+                onClick={() => setSelectedCategory(null)}
+              >
+                All
+              </button>
+              {categories.map(cat => (
+                <button
+                  key={cat.name}
+                  className={`category-chip ${selectedCategory === cat.name ? 'active' : ''}`}
+                  onClick={() => setSelectedCategory(selectedCategory === cat.name ? null : cat.name)}
+                >
+                  {cat.name.split(' ')[0]} ({cat.count})
+                </button>
+              ))}
+            </div>
+
+            {/* Dataset List */}
+            <div className="dataset-list-container">
+              {filteredDatasets.map(d => (
+                <div key={d.id} className="dataset-option" onClick={() => addComponent(d)}>
+                  <span className="dataset-title">{d.title}</span>
+                  {d.description && (
+                    <Tooltip text={d.description}>
+                      <span className="info-icon">ⓘ</span>
+                    </Tooltip>
+                  )}
                 </div>
+              ))}
+              {filteredDatasets.length === 0 && (
+                <div className="no-results">No datasets found</div>
               )}
             </div>
 

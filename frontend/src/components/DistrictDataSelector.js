@@ -5,8 +5,10 @@ const API_URL = `http://${window.location.hostname}:5001/api`;
 
 function DistrictDataSelector({ onDataChange, onClose }) {
   const [allDatasets, setAllDatasets] = useState([]);
+  const [searchResults, setSearchResults] = useState(null); // null = not searching, [] = no results
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const [searchLoading, setSearchLoading] = useState(false);
   const [selectedDataset, setSelectedDataset] = useState(null);
   const [columns, setColumns] = useState([]);
   const [selectedColumn, setSelectedColumn] = useState('');
@@ -20,6 +22,20 @@ function DistrictDataSelector({ onDataChange, onClose }) {
   useEffect(() => {
     loadDatasets();
   }, []);
+
+  // Debounced search when query or showAll changes
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSearchResults(null);
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      searchDatasets(searchQuery);
+    }, 300); // 300ms debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery, showAll]);
 
   const loadDatasets = async () => {
     try {
@@ -46,6 +62,37 @@ function DistrictDataSelector({ onDataChange, onClose }) {
     }
   };
 
+  const searchDatasets = async (query) => {
+    console.log('searchDatasets called with:', query);
+    try {
+      setSearchLoading(true);
+      const params = new URLSearchParams({
+        q: query,
+        limit: '50'
+      });
+
+      const url = `${API_URL}/v2/datasets/search?${params}`;
+      console.log('Fetching:', url);
+
+      const response = await fetch(url);
+      const data = await response.json();
+
+      console.log('Response:', data.success, 'count:', data.count, 'datasets:', data.datasets?.length);
+
+      if (data.success) {
+        setSearchResults(data.datasets);
+      } else {
+        console.error('Search failed:', data.error);
+        setSearchResults([]);
+      }
+    } catch (err) {
+      console.error('Search error:', err);
+      setSearchResults([]);
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
   // Check if dataset is district-related
   const isDistrictDataset = (ds) => {
     const title = ds.title?.toLowerCase() || '';
@@ -63,6 +110,12 @@ function DistrictDataSelector({ onDataChange, onClose }) {
 
   // Filter datasets based on search and showAll toggle
   const filteredDatasets = useMemo(() => {
+    // If we have search results from backend, use those (already ranked by relevance)
+    if (searchResults !== null) {
+      return searchResults;
+    }
+
+    // Otherwise, filter the local dataset list
     let datasets = allDatasets;
 
     // If not showing all, only show district-related
@@ -70,17 +123,8 @@ function DistrictDataSelector({ onDataChange, onClose }) {
       datasets = datasets.filter(isDistrictDataset);
     }
 
-    // Apply search filter
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      datasets = datasets.filter(ds =>
-        ds.title?.toLowerCase().includes(query) ||
-        ds.description?.toLowerCase().includes(query)
-      );
-    }
-
     return datasets;
-  }, [allDatasets, searchQuery, showAll]);
+  }, [allDatasets, searchResults, showAll]);
 
   const handleDatasetSelect = async (dataset) => {
     setSelectedDataset(dataset);
@@ -180,13 +224,16 @@ function DistrictDataSelector({ onDataChange, onClose }) {
           <>
             {/* Search and Filter */}
             <div className="selector-section">
-              <input
-                type="text"
-                className="dataset-search"
-                placeholder="Search datasets..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
+              <div className="search-input-wrapper">
+                <input
+                  type="text"
+                  className="dataset-search"
+                  placeholder="Search datasets (semantic)..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+                {searchLoading && <span className="search-spinner">...</span>}
+              </div>
               <label className="show-all-toggle">
                 <input
                   type="checkbox"
