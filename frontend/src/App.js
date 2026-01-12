@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import MapView from './components/MapView';
 import Chatbot from './components/Chatbot';
+import Tooltip from './components/Tooltip';
 import './App.css';
 
 const API_URL = `http://${window.location.hostname}:5001/api`;
@@ -463,7 +464,9 @@ function App() {
                     <div key={d.id} className="dataset-option" onClick={() => addComponent(d)}>
                       <span className="dataset-title">{d.title}</span>
                       {d.description && (
-                        <span className="dataset-info-icon" data-tooltip={d.description}>ⓘ</span>
+                        <Tooltip text={d.description}>
+                          <span className="info-icon">ⓘ</span>
+                        </Tooltip>
                       )}
                     </div>
                   ))}
@@ -483,6 +486,11 @@ function App() {
                           onChange={(e) => updateComponent(c.dataset.id, 'label', e.target.value)}
                           className="component-label"
                         />
+                        {c.dataset.description && (
+                          <Tooltip text={c.dataset.description}>
+                            <span className="info-icon">ⓘ</span>
+                          </Tooltip>
+                        )}
                         <button onClick={() => removeComponent(c.dataset.id)}>×</button>
                       </div>
 
@@ -609,7 +617,14 @@ function App() {
                 return (
                   <div key={i} className="breakdown-item">
                     <div className="breakdown-row">
-                      <span className="breakdown-label">{item.label}</span>
+                      <span className="breakdown-label">
+                        {item.label}
+                        {item.description && (
+                          <Tooltip text={item.description}>
+                            <span className="info-icon">ⓘ</span>
+                          </Tooltip>
+                        )}
+                      </span>
                       <span className={`breakdown-weight ${item.weight < 0 ? 'negative' : 'positive'}`}>
                         {item.weight > 0 ? '+' : ''}{(item.weight * 100).toFixed(0)}%
                       </span>
