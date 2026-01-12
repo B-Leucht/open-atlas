@@ -3,7 +3,7 @@ Composite Index Calculator for Open Atlas
 Enables creating district-level indices by combining multiple datasets with weights.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 from enum import Enum
 import logging

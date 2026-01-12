@@ -5,7 +5,7 @@ import proj4 from 'proj4';
 import 'leaflet/dist/leaflet.css';
 import './MapView.css';
 
-const { Overlay, BaseLayer } = LayersControl;
+const { Overlay } = LayersControl;
 
 // API base URL
 const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5001';
@@ -112,7 +112,6 @@ const getDistrictColor = (value, min, max) => {
 function MapView({ results, datasetMetadata = {}, onMapMove, showDistricts = true, districtData = null, onDistrictClick = null }) {
   // State for district boundaries
   const [districts, setDistricts] = useState(null);
-  const [districtsLoading, setDistrictsLoading] = useState(false);
   const [selectedDistrict, setSelectedDistrict] = useState(null);
   const [hoveredDistrict, setHoveredDistrict] = useState(null);
 
@@ -121,7 +120,6 @@ function MapView({ results, datasetMetadata = {}, onMapMove, showDistricts = tru
     if (!showDistricts) return;
 
     const fetchDistricts = async () => {
-      setDistrictsLoading(true);
       try {
         const response = await fetch(`${API_BASE}/api/districts`);
         if (response.ok) {
@@ -132,8 +130,6 @@ function MapView({ results, datasetMetadata = {}, onMapMove, showDistricts = tru
         }
       } catch (error) {
         console.error('Failed to fetch districts:', error);
-      } finally {
-        setDistrictsLoading(false);
       }
     };
 
@@ -189,7 +185,7 @@ function MapView({ results, datasetMetadata = {}, onMapMove, showDistricts = tru
         setHoveredDistrict(null);
         e.target.setStyle(getDistrictStyle(feature));
       },
-      click: (e) => {
+      click: () => {
         setSelectedDistrict(props.district_id === selectedDistrict ? null : props.district_id);
         if (onDistrictClick) {
           onDistrictClick(props);
@@ -363,6 +359,7 @@ function MapView({ results, datasetMetadata = {}, onMapMove, showDistricts = tru
           [48.3, 11.9]   // Northeast corner
         ]}
         maxBoundsViscosity={1.0}
+        zoomControl={false}
         className="map-container"
       >
         {onMapMove && <MapEventHandler onMapMove={onMapMove} />}
@@ -383,7 +380,7 @@ function MapView({ results, datasetMetadata = {}, onMapMove, showDistricts = tru
 
         <LayersControl position="topright" collapsed={false}>
           {/* Render each dataset as a separate layer */}
-          {Object.entries(groupedData).map(([category, data], index) => {
+          {Object.entries(groupedData).map(([category, data]) => {
             const color = getCategoryColor(category);
             const metadata = datasetMetadata[category];
             const datasetName = metadata?.title || category.substring(0, 12) + '...';

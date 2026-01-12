@@ -3,8 +3,6 @@ from flask_cors import CORS
 import threading
 import logging
 from typing import List, Dict, Any, Optional
-from functools import lru_cache
-from datetime import datetime
 
 # Configure logging to show INFO level messages
 logging.basicConfig(

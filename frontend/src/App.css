@@ -648,17 +648,111 @@ body {
   font-size: 0.875rem;
 }
 
-/* Responsive */
-@media (max-width: 768px) {
-  .app {
+/* Sidebar Toggle Button */
+.sidebar-toggle {
+  display: none;
+  position: fixed;
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
+  z-index: 1100;
+  width: 28px;
+  height: 56px;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-left: none;
+  border-radius: 0 8px 8px 0;
+  box-shadow: 2px 0 8px rgba(0,0,0,0.1);
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  transition: left 0.3s ease;
+}
+
+.sidebar-toggle:hover {
+  background: #f5f5f5;
+}
+
+.sidebar-toggle.shifted {
+  left: 320px;
+}
+
+/* Responsive - Tablet/Small Desktop */
+@media (max-width: 900px) {
+  .sidebar-toggle {
+    display: flex;
+  }
+
+
+  .side-panel {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 320px;
+    height: 100vh;
+    z-index: 999;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    box-shadow: 2px 0 12px rgba(0,0,0,0.1);
+  }
+
+  .side-panel.open {
+    transform: translateX(0);
+  }
+
+  .map-wrapper {
+    width: 100%;
+  }
+}
+
+/* Mobile */
+@media (max-width: 480px) {
+  .side-panel {
+    width: 100%;
+  }
+
+  .sidebar-toggle.shifted {
+    left: calc(100% - 28px);
+  }
+
+  .side-panel .panel-header {
+    padding-right: 3.5rem;
+  }
+
+  /* Adjust chatbot position on mobile */
+  .chatbot-container {
+    bottom: 1rem;
+    right: 1rem;
+    left: 1rem;
+    width: auto;
+  }
+
+  .chatbot-container.open {
+    height: 60vh;
+    max-height: 60vh;
+  }
+
+  .preset-list {
     flex-direction: column;
   }
 
-  .side-panel {
+  .preset-btn {
     width: 100%;
-    max-height: 50vh;
-    border-right: none;
-    border-bottom: 1px solid #e0e0e0;
+    justify-content: flex-start;
   }
 
+  .component-options {
+    flex-wrap: wrap;
+  }
+
+  .component-options select {
+    min-width: calc(50% - 0.25rem);
+  }
+
+  .category-chips {
+    max-height: 60px;
+    overflow-y: auto;
+  }
 }
+

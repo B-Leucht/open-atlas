@@ -14,7 +14,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
-DB_PATH = Path(__file__).parent / "backend" / "data" / "openatlas.db"
+DB_PATH = Path(__file__).parent.parent / "backend" / "data" / "openatlas.db"
 
 COLORS = [
     '#00d4ff', '#ff006e', '#ffbe0b', '#8338ec', '#3a86ff', '#00f5d4',
