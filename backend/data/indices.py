@@ -318,6 +318,7 @@ class IndexCalculator:
         # Calculate raw values for each component
         component_values: List[Dict[str, float]] = []
         raw_component_values: List[Dict[str, float]] = []  # Pre-normalization values
+        successful_components: List[IndexComponent] = []  # Track which components have data
         component_info: List[Dict[str, Any]] = []
         skipped_components: List[Dict[str, Any]] = []
 
@@ -334,6 +335,7 @@ class IndexCalculator:
             values = self._calculate_component(comp, districts, year)
             if values:
                 component_values.append(values)
+                successful_components.append(comp)
                 # Store raw values before any district-level normalization was applied
                 # Note: _calculate_component already applies normalization, so we need raw counts
                 raw_values = self._calculate_raw_component(comp, districts, year)
@@ -357,7 +359,7 @@ class IndexCalculator:
             return {"success": False, "error": "No data available for any component"}
 
         # Combine components into final scores with breakdown
-        final_scores, breakdown = self._combine_components_with_breakdown(components, component_values, raw_component_values, districts)
+        final_scores, breakdown = self._combine_components_with_breakdown(successful_components, component_values, raw_component_values, districts)
 
         # Build response
         return {
@@ -667,16 +669,18 @@ class IndexCalculator:
         # Normalize all component values to 0-100 scale for fair combination
         normalized_components = []
         for values in component_values:
-            if values:
-                min_val = min(values.values()) if values else 0
-                max_val = max(values.values()) if values else 0
+            # Add missing districts with value 0 so they participate in normalization
+            full_values = {dn: values.get(dn, 0) for dn in district_nums}
+            if full_values:
+                min_val = min(full_values.values())
+                max_val = max(full_values.values())
                 if max_val > min_val:
                     normalized = {
                         k: ((v - min_val) / (max_val - min_val)) * 100
-                        for k, v in values.items()
+                        for k, v in full_values.items()
                     }
                 else:
-                    normalized = {k: 50 for k in values}
+                    normalized = {k: 50 for k in full_values}
                 normalized_components.append(normalized)
             else:
                 normalized_components.append({})
@@ -692,7 +696,7 @@ class IndexCalculator:
 
             for i, comp in enumerate(components):
                 if i < len(normalized_components):
-                    raw_value = normalized_components[i].get(district_num, 50)
+                    raw_value = normalized_components[i].get(district_num, 0)
                     # Negative weight means inverse (higher raw = lower score)
                     effective_value = 100 - raw_value if comp.weight < 0 else raw_value
                     contribution = effective_value * abs(comp.weight)
@@ -721,7 +725,7 @@ class IndexCalculator:
             if weight_sum > 0:
                 final_scores[district_num] = score / weight_sum
             else:
-                final_scores[district_num] = 50
+                final_scores[district_num] = 0
 
             breakdown[district_num] = district_breakdown
 
