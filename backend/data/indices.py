@@ -753,9 +753,11 @@ class IndexCalculator:
 
     def get_available_datasets(self) -> List[Dict[str, Any]]:
         """Get datasets that can be used in custom indices"""
+        import json
+
         with self.db.get_connection() as conn:
             cursor = conn.execute("""
-                SELECT id, title, feature_count, is_district_specific, has_geometry, description
+                SELECT id, title, feature_count, is_district_specific, has_geometry, description, groups
                 FROM datasets
                 WHERE feature_count > 0
                 ORDER BY
@@ -763,14 +765,23 @@ class IndexCalculator:
                     title
             """)
 
-            return [
-                {
+            results = []
+            for row in cursor.fetchall():
+                groups = []
+                if row[6]:
+                    try:
+                        groups = json.loads(row[6])
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+
+                results.append({
                     "id": row[0],
                     "title": row[1],
                     "feature_count": row[2],
                     "is_district_specific": bool(row[3]),
                     "has_geometry": bool(row[4]),
                     "description": row[5],
-                }
-                for row in cursor.fetchall()
-            ]
+                    "groups": groups,
+                })
+
+            return results

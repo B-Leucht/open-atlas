@@ -209,6 +209,58 @@ body {
   color: #0066cc;
 }
 
+/* Category Filter Chips */
+.category-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  margin-bottom: 0.5rem;
+}
+
+.category-chip {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.6875rem;
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  background: #f8f9fa;
+  color: #495057;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.category-chip:hover {
+  background: #e9ecef;
+  border-color: #adb5bd;
+}
+
+.category-chip.active {
+  background: #0066cc;
+  color: white;
+  border-color: #0066cc;
+}
+
+/* Dataset List */
+.dataset-list-container {
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  margin-bottom: 0.75rem;
+}
+
+.dataset-list-container .dataset-option {
+  font-size: 0.75rem;
+  padding: 0.4rem 0.6rem;
+}
+
+.no-results {
+  padding: 1rem;
+  text-align: center;
+  color: #999;
+  font-size: 0.8rem;
+}
+
 /* Component List */
 .component-list {
   display: flex;
