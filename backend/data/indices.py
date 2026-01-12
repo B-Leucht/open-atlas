@@ -58,23 +58,15 @@ CHILD_FRIENDLY_INDEX = IndexPreset(
         IndexComponent(
             dataset_pattern="Öffentliche Spielplätze",
             column=None,
-            weight=0.25,
+            weight=0.20,
             aggregation="count",
             normalize=NormalizationType.POPULATION,
             label="Playgrounds"
         ),
         IndexComponent(
-            dataset_pattern="Kindertagesbetreuungseinrichtungen",
-            column=None,
-            weight=0.25,
-            aggregation="count",
-            normalize=NormalizationType.POPULATION,
-            label="Childcare facilities"
-        ),
-        IndexComponent(
             dataset_pattern="Tempo-30-Zone",
             column=None,
-            weight=0.15,
+            weight=0.10,
             aggregation="count",
             normalize=NormalizationType.AREA,
             label="Traffic calming"
@@ -82,7 +74,7 @@ CHILD_FRIENDLY_INDEX = IndexPreset(
         IndexComponent(
             dataset_pattern="Gefahrenstellen",
             column=None,
-            weight=-0.15,
+            weight=-0.10,
             aggregation="count",
             normalize=NormalizationType.AREA,
             label="Danger spots (inverse)"
@@ -90,11 +82,27 @@ CHILD_FRIENDLY_INDEX = IndexPreset(
         IndexComponent(
             dataset_pattern="Kinderbetreuung - Betreuungsangebot",
             column="Indikatorwert",
-            weight=0.20,
+            weight=0.15,
             aggregation="avg",
-            normalize=NormalizationType.MINMAX,
+            normalize=NormalizationType.POPULATION,
             label="Childcare availability"
         ),
+        IndexComponent(
+            dataset_pattern="Schulen und Schüler*innenzahlen in München",
+            column=None,
+            weight=0.20,
+            aggregation="count",
+            normalize=NormalizationType.POPULATION,
+            label="Schools"
+        ),
+        IndexComponent(
+            dataset_pattern="Monatszahlen Verkehrsunfälle",
+            column=None,
+            weight=-0.10,
+            aggregation="count",
+            normalize=NormalizationType.AREA,
+            label="Traffic accidents (inverse)"
+        )
     ]
 )
 
@@ -116,7 +124,7 @@ SENIOR_FRIENDLY_INDEX = IndexPreset(
         IndexComponent(
             dataset_pattern="Arzt*Ärztin-Dichte",
             column="Indikatorwert",
-            weight=0.25,
+            weight=-0.25,
             aggregation="avg",
             normalize=NormalizationType.MINMAX,
             label="Doctor density"
@@ -124,18 +132,10 @@ SENIOR_FRIENDLY_INDEX = IndexPreset(
         IndexComponent(
             dataset_pattern="Apotheken-Dichte",
             column="Indikatorwert",
-            weight=0.15,
+            weight=-0.15,
             aggregation="avg",
             normalize=NormalizationType.MINMAX,
             label="Pharmacy density"
-        ),
-        IndexComponent(
-            dataset_pattern="Behindertenparkplätze",
-            column=None,
-            weight=0.15,
-            aggregation="count",
-            normalize=NormalizationType.AREA,
-            label="Accessible parking"
         ),
         IndexComponent(
             dataset_pattern="Vollstationäre Pflegeeinrichtungen",
@@ -144,8 +144,108 @@ SENIOR_FRIENDLY_INDEX = IndexPreset(
             aggregation="count",
             normalize=NormalizationType.POPULATION,
             label="Care facilities"
-        ),
+        )
     ]
+)
+
+GREENNESS_INDEX = IndexPreset(
+    id="greenness",
+    name = "Greenness",
+    description = "measures how green a certain district is.",
+    icon = "🌲",
+    higher_is_better = True,
+    components = [
+        IndexComponent(
+            dataset_pattern = "Stadtgüter Stadt München",
+            column = None,
+            weight = 0.2,
+            aggregation = "count",
+            normalize = NormalizationType.AREA,
+            label = "Green spaces"
+        ),
+        IndexComponent(
+            dataset_pattern ="Öffentliche Spielplätze München",
+            column = None,
+            weight = 0.05,
+            aggregation = "count",
+            normalize = NormalizationType.AREA,
+            label = "Playgrounds"
+        ),
+        IndexComponent(
+            dataset_pattern="Radlstadtplan (Fahrradstraßen)",
+            column = None,
+            weight = 0.25,
+            aggregation = "count",
+            normalize = NormalizationType.AREA,
+            label = "Bike lanes"
+        ),
+        IndexComponent(
+            dataset_pattern ="Radlstadtplan (Radwege)",
+            column = None,
+            weight = 0.2,
+            aggregation = "count",
+            normalize = NormalizationType.AREA,
+            label = "Pedestrian roads"
+        )
+]
+)
+
+ENTERTAINMENT_INDEX = IndexPreset(
+    id = "entertainment",
+    name = "Entertainment",
+    description = "Entertainment services per disctrict",
+    icon = "🍿",
+    higher_is_better = True,
+    components = [
+        IndexComponent(
+            dataset_pattern="Städtische Kultureinrichtungen",
+            column = None,
+            weight = 0.2,
+            aggregation = "count",
+            normalize = NormalizationType.POPULATION,
+            label = "Culture facilities"
+        ),
+        IndexComponent(
+            dataset_pattern="Schwimmbäder in München",
+            column = None,
+            weight = 0.1,
+            aggregation="count",
+            normalize = NormalizationType.POPULATION,
+            label = "Swimming pools"
+        ),
+        IndexComponent(
+            dataset_pattern="Baden in der Isar",
+            column= None,
+            weight  =0.1,
+            aggregation="count",
+            normalize = NormalizationType.AREA,
+            label = "Swimming Areas Isar"
+        ),
+        IndexComponent(
+            dataset_pattern="Touristische Points of Interests (POI) München",
+            column = None,
+            weight = 0.2,
+            aggregation="count",
+            normalize = NormalizationType.AREA,
+            label = "Touristic points of interest"
+        ),
+        IndexComponent(
+            dataset_pattern="Märkte der Landeshauptstadt München",
+            column =None,
+            weight = 0.1,
+            aggregation="count",
+            normalize = NormalizationType.AREA,
+            label = "Markets"
+        ),
+        IndexComponent(
+            dataset_pattern = "Weihnachtsmärkte München",
+            column = None,
+            weight = 0.1,
+            aggregation= "count",
+            normalize = NormalizationType.AREA,
+            label = "Christmas Markets"
+        ),
+]
 )
 
 SERVICES_INDEX = IndexPreset(
@@ -203,6 +303,8 @@ INDEX_PRESETS = {
     "child-friendly": CHILD_FRIENDLY_INDEX,
     "senior-friendly": SENIOR_FRIENDLY_INDEX,
     "services": SERVICES_INDEX,
+    "greenness": GREENNESS_INDEX,
+    "entertainment": ENTERTAINMENT_INDEX
 }
 
 
