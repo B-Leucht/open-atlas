@@ -355,9 +355,11 @@ function App() {
   };
 
   const addComponent = async (dataset) => {
-    if (customComponents.find(c => c.dataset.id === dataset.id)) return;
+    // Generate a unique ID for this component (allows same dataset multiple times)
+    const componentId = `${dataset.id}_${Date.now()}_${Math.random()}`;
     const columns = await loadDatasetColumns(dataset.id);
     setCustomComponents([...customComponents, {
+      id: componentId,  // Unique ID for this component instance
       dataset,
       columns,
       column: null,
@@ -369,13 +371,13 @@ function App() {
     setDatasetSearch('');
   };
 
-  const removeComponent = (datasetId) => {
-    setCustomComponents(customComponents.filter(c => c.dataset.id !== datasetId));
+  const removeComponent = (componentId) => {
+    setCustomComponents(customComponents.filter(c => c.id !== componentId));
   };
 
-  const updateComponent = (datasetId, field, value) => {
+  const updateComponent = (componentId, field, value) => {
     setCustomComponents(customComponents.map(c =>
-      c.dataset.id === datasetId ? { ...c, [field]: value } : c
+      c.id === componentId ? { ...c, [field]: value } : c
     ));
   };
 
@@ -388,7 +390,9 @@ function App() {
       const dataset = availableDatasets.find(d => d.id === comp.dataset_id);
       if (dataset) {
         const columns = await loadDatasetColumns(dataset.id);
+        const componentId = `${dataset.id}_${Date.now()}_${Math.random()}`;
         newComponents.push({
+          id: componentId,  // Unique ID for this component instance
           dataset,
           columns,
           column: comp.column || null,
@@ -407,8 +411,7 @@ function App() {
   };
 
   const filteredDatasets = availableDatasets.filter(d =>
-    d.title.toLowerCase().includes(datasetSearch.toLowerCase()) &&
-    !customComponents.find(c => c.dataset.id === d.id)
+    d.title.toLowerCase().includes(datasetSearch.toLowerCase())
   ).slice(0, 8);
 
   return (
@@ -478,12 +481,12 @@ function App() {
               <>
                 <div className="component-list">
                   {customComponents.map(c => (
-                    <div key={c.dataset.id} className="component-card">
+                    <div key={c.id} className="component-card">
                       <div className="component-header">
                         <input
                           type="text"
                           value={c.label}
-                          onChange={(e) => updateComponent(c.dataset.id, 'label', e.target.value)}
+                          onChange={(e) => updateComponent(c.id, 'label', e.target.value)}
                           className="component-label"
                         />
                         {c.dataset.description && (
@@ -491,13 +494,13 @@ function App() {
                             <span className="info-icon">ⓘ</span>
                           </Tooltip>
                         )}
-                        <button onClick={() => removeComponent(c.dataset.id)}>×</button>
+                        <button onClick={() => removeComponent(c.id)}>×</button>
                       </div>
 
                       <div className="component-options">
                         <select
                           value={c.aggregation}
-                          onChange={(e) => updateComponent(c.dataset.id, 'aggregation', e.target.value)}
+                          onChange={(e) => updateComponent(c.id, 'aggregation', e.target.value)}
                         >
                           {AGGREGATION_OPTIONS(lang).map(opt => (
                             <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -507,7 +510,7 @@ function App() {
                         {c.aggregation !== 'count' && c.columns.length > 0 && (
                           <select
                             value={c.column || ''}
-                            onChange={(e) => updateComponent(c.dataset.id, 'column', e.target.value || null)}
+                            onChange={(e) => updateComponent(c.id, 'column', e.target.value || null)}
                           >
                             <option value="">{lang === 'de' ? 'Spalte...' : 'Column...'}</option>
                             {c.columns.map(col => (
@@ -518,7 +521,7 @@ function App() {
 
                         <select
                           value={c.normalize}
-                          onChange={(e) => updateComponent(c.dataset.id, 'normalize', e.target.value)}
+                          onChange={(e) => updateComponent(c.id, 'normalize', e.target.value)}
                         >
                           {NORMALIZATION_OPTIONS(lang).map(opt => (
                             <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -536,7 +539,7 @@ function App() {
                           max="1"
                           step="0.1"
                           value={c.weight}
-                          onChange={(e) => updateComponent(c.dataset.id, 'weight', parseFloat(e.target.value))}
+                          onChange={(e) => updateComponent(c.id, 'weight', parseFloat(e.target.value))}
                         />
                       </div>
                     </div>

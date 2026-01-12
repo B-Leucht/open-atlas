@@ -504,6 +504,46 @@ def get_dataset_features(dataset_id):
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/v2/datasets/search', methods=['GET'])
+def search_datasets():
+    """Search datasets with fuzzy matching on title, description, tags, and groups"""
+    try:
+        query = request.args.get('q', '').strip()
+        if not query:
+            return jsonify({'success': False, 'error': 'Query parameter "q" is required'}), 400
+        
+        db = get_db()
+        source_id = request.args.get('source', 'munich')
+        limit = min(request.args.get('limit', 50, type=int), 200)
+        
+        datasets = db.search_datasets(query, source_id, limit)
+        
+        return jsonify({
+            'success': True,
+            'query': query,
+            'count': len(datasets),
+            'datasets': [d.to_dict() for d in datasets]
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/v2/datasets/categories', methods=['GET'])
+def get_dataset_categories():
+    """Get datasets organized by categories (groups)"""
+    try:
+        db = get_db()
+        source_id = request.args.get('source', 'munich')
+        limit = min(request.args.get('limit', 500, type=int), 1000)
+        
+        result = db.get_datasets_by_category(source_id, limit)
+        
+        return jsonify({
+            'success': True,
+            'data': result
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 # ============================================================================
 # Spatial Query Endpoints
 # ============================================================================
@@ -785,6 +825,8 @@ def index():
                 'GET /api/v2/datasets': 'List datasets (params: source, geo, district_specific, limit)',
                 'GET /api/v2/datasets/:id': 'Get dataset details',
                 'GET /api/v2/datasets/:id/features': 'Get dataset features as GeoJSON',
+                'GET /api/v2/datasets/search': 'Search datasets with fuzzy matching (params: q, source, limit)',
+                'GET /api/v2/datasets/categories': 'Get datasets organized by categories (params: source, limit)',
                 'GET /api/v2/stats': 'Get local database statistics'
             },
             'Spatial Queries': {

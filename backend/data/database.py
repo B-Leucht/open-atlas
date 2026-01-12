@@ -470,21 +470,68 @@ class Database:
             return self._row_to_dataset(row) if row else None
 
     def search_datasets(self, query: str, source_id: str = None, limit: int = 50) -> List[Dataset]:
-        """Search datasets by title or description"""
+        """
+        Search datasets by title, description, tags, and groups with fuzzy matching.
+        Uses relevance scoring to return best matches first.
+        """
         with self.get_connection() as conn:
             cursor = conn.cursor()
 
+            # Split query into individual words for better fuzzy matching
+            query_words = query.lower().split()
+            
+            # Build fuzzy search conditions for each word
+            # Search in title, description, tags, and groups
             sql = '''
-                SELECT * FROM datasets
-                WHERE (title LIKE ? OR description LIKE ?)
+                SELECT *,
+                    -- Relevance scoring: title matches are weighted highest
+                    (CASE 
+                        WHEN LOWER(title) = LOWER(?) THEN 100
+                        WHEN LOWER(title) LIKE ? THEN 90
+                        ELSE 0 
+                    END) as title_score,
+                    -- Description matches are weighted lower
+                    (CASE 
+                        WHEN LOWER(description) LIKE ? THEN 50
+                        ELSE 0
+                    END) as desc_score,
+                    -- Tags and groups matches are weighted medium
+                    (CASE 
+                        WHEN LOWER(tags) LIKE ? OR LOWER(groups) LIKE ? THEN 70
+                        ELSE 0
+                    END) as tags_score
+                FROM datasets
+                WHERE (
             '''
-            params = [f'%{query}%', f'%{query}%']
+            
+            # Add conditions for each query word
+            conditions = []
+            params = []
+            
+            # Exact and fuzzy title match parameters for scoring
+            params.extend([query, f'%{query}%', f'%{query}%', f'%{query}%', f'%{query}%'])
+            
+            # Build WHERE conditions for each word
+            for word in query_words:
+                word_conditions = [
+                    'LOWER(title) LIKE ?',
+                    'LOWER(description) LIKE ?',
+                    'LOWER(tags) LIKE ?',
+                    'LOWER(groups) LIKE ?',
+                    'LOWER(organization) LIKE ?'
+                ]
+                conditions.append(f"({' OR '.join(word_conditions)})")
+                # Add parameter for each condition
+                params.extend([f'%{word}%'] * 5)
+            
+            sql += ' AND '.join(conditions) + ')'
 
             if source_id:
                 sql += ' AND source_id = ?'
                 params.append(source_id)
 
-            sql += ' ORDER BY title LIMIT ?'
+            # Order by relevance score (sum of all scores), then by title
+            sql += ' ORDER BY (title_score + desc_score + tags_score) DESC, title LIMIT ?'
             params.append(limit)
 
             cursor.execute(sql, params)
@@ -493,6 +540,111 @@ class Database:
             for row in cursor.fetchall():
                 datasets.append(self._row_to_dataset(row))
             return datasets
+
+    def get_dataset_categories(self, source_id: str = None) -> Dict[str, List[str]]:
+        """
+        Get all unique categories (groups and common tags) from datasets.
+        Returns a dict mapping category names to dataset IDs.
+        """
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            
+            sql = 'SELECT id, groups, tags FROM datasets WHERE 1=1'
+            params = []
+            
+            if source_id:
+                sql += ' AND source_id = ?'
+                params.append(source_id)
+            
+            cursor.execute(sql, params)
+            
+            categories = {}
+            
+            for row in cursor.fetchall():
+                dataset_id = row['id']
+                groups = json.loads(row['groups']) if row['groups'] else []
+                tags = json.loads(row['tags']) if row['tags'] else []
+                
+                # Add groups as categories
+                for group in groups:
+                    if group not in categories:
+                        categories[group] = []
+                    categories[group].append(dataset_id)
+                
+                # Add common/meaningful tags as categories
+                for tag in tags:
+                    # Only include meaningful tags (not too generic)
+                    if len(tag) > 3 and tag.lower() not in ['data', 'open', 'stadt']:
+                        if tag not in categories:
+                            categories[tag] = []
+                        categories[tag].append(dataset_id)
+            
+            return categories
+
+    def get_datasets_by_category(self, source_id: str = None, limit: int = 500) -> Dict[str, Any]:
+        """
+        Get datasets organized by categories (groups).
+        Returns a dict with category information and datasets per category.
+        """
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            
+            sql = 'SELECT * FROM datasets WHERE 1=1'
+            params = []
+            
+            if source_id:
+                sql += ' AND source_id = ?'
+                params.append(source_id)
+            
+            sql += ' ORDER BY title'
+            
+            if limit:
+                sql += ' LIMIT ?'
+                params.append(limit)
+            
+            cursor.execute(sql, params)
+            
+            # Organize by groups/categories
+            categories = {}
+            uncategorized = []
+            
+            for row in cursor.fetchall():
+                dataset = self._row_to_dataset(row)
+                groups = dataset.groups if dataset.groups else []
+                
+                if not groups:
+                    uncategorized.append(dataset)
+                else:
+                    for group in groups:
+                        if group not in categories:
+                            categories[group] = []
+                        categories[group].append(dataset)
+            
+            # Build result
+            result = {
+                'categories': {}
+            }
+            
+            # Add categorized datasets
+            for cat_name, datasets in sorted(categories.items()):
+                result['categories'][cat_name] = {
+                    'name': cat_name,
+                    'count': len(datasets),
+                    'datasets': [d.to_dict() for d in datasets]
+                }
+            
+            # Add uncategorized if any
+            if uncategorized:
+                result['categories']['Uncategorized'] = {
+                    'name': 'Uncategorized',
+                    'count': len(uncategorized),
+                    'datasets': [d.to_dict() for d in uncategorized]
+                }
+            
+            result['total_categories'] = len(result['categories'])
+            result['total_datasets'] = sum(cat['count'] for cat in result['categories'].values())
+            
+            return result
 
     def _row_to_dataset(self, row: sqlite3.Row) -> Dataset:
         resources_data = json.loads(row['resources']) if row['resources'] else []
