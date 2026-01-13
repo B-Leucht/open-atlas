@@ -324,11 +324,19 @@ def analyze_csv(url: str, user_query: str) -> Dict[str, Any]:
         coords = _extract_coordinates(result_df)
         logger.info(f"CSV coordinate extraction result: {len(coords) if coords else 0} coordinates")
 
+        # Get display columns (exclude coordinate columns from table display if coordinates were found)
+        if coords:
+            display_cols = _get_display_columns(result_df)
+            display_df = result_df[display_cols] if display_cols else result_df
+        else:
+            display_cols = list(result_df.columns)
+            display_df = result_df
+
         result = {
             "kind": "csv",
             "sql_query": sql_query,
-            "preview_markdown": result_df.head(200).to_markdown(index=False),
-            "columns": list(result_df.columns),
+            "preview_markdown": display_df.head(200).to_markdown(index=False),
+            "columns": display_cols,
             "row_count": len(result_df),
         }
 
@@ -339,6 +347,28 @@ def analyze_csv(url: str, user_query: str) -> Dict[str, Any]:
 
     finally:
         conn.close()
+
+
+def _get_display_columns(df: pd.DataFrame) -> List[str]:
+    """
+    Get columns suitable for display, excluding coordinate/geometry columns.
+    These columns are still used for map display but hidden from the table.
+    """
+    exclude_patterns = [
+        'geometry', 'geom', 'wkb_geometry', 'the_geom', 'shape',
+        'lat', 'latitude', 'lon', 'longitude', 'x', 'y',
+        'rechtswert', 'hochwert', 'easting', 'northing'
+    ]
+    display_cols = []
+    for col in df.columns:
+        col_lower = col.lower()
+        # Exclude geometry columns and coordinate columns
+        if not any(pattern in col_lower for pattern in exclude_patterns):
+            # Also exclude columns that look like raw coordinate values
+            sample = df[col].head(5).astype(str).tolist()
+            if not any("POINT" in str(s).upper() for s in sample):
+                display_cols.append(col)
+    return display_cols
 
 
 def analyze_geospatial(url: str, user_query: str) -> Dict[str, Any]:
@@ -378,16 +408,20 @@ def analyze_geospatial(url: str, user_query: str) -> Dict[str, Any]:
             result_df = preview_df
             sql_query = "SELECT * FROM geo LIMIT 200"
 
-        # Extract coordinates if present
+        # Extract coordinates if present (before filtering columns)
         logger.info(f"Calling _extract_coordinates with DataFrame of shape {result_df.shape}")
         coords = _extract_coordinates(result_df)
         logger.info(f"_extract_coordinates returned: {len(coords) if coords else 0} coordinates")
 
+        # Get display columns (exclude geometry/coordinate columns from table display)
+        display_cols = _get_display_columns(result_df)
+        display_df = result_df[display_cols] if display_cols else result_df
+
         result = {
             "kind": "geospatial",
             "sql_query": sql_query,
-            "preview_markdown": result_df.head(200).to_markdown(index=False),
-            "columns": list(result_df.columns),
+            "preview_markdown": display_df.head(200).to_markdown(index=False),
+            "columns": display_cols,
             "row_count": len(result_df),
         }
 

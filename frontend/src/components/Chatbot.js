@@ -62,6 +62,7 @@ export default function Chatbot({ onIndexResult, onGeoData }) {
   ]);
   const [sending, setSending] = useState(false);
   const [apiHealthy, setApiHealthy] = useState(null);
+  const [threadId, setThreadId] = useState(null);
 
   const messagesRef = useRef(null);
 
@@ -105,13 +106,19 @@ export default function Chatbot({ onIndexResult, onGeoData }) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          query: userMessageText
+          query: userMessageText,
+          thread_id: threadId
         }),
       });
 
       const data = await response.json();
 
       if (data.success) {
+        // Store thread_id for conversation continuity
+        if (data.thread_id) {
+          setThreadId(data.thread_id);
+        }
+
         // Build message with optional visualization indicator
         let messageText = data.answer;
         let hasVisualization = false;
@@ -202,6 +209,15 @@ export default function Chatbot({ onIndexResult, onGeoData }) {
                 </div>
               </div>
             ))}
+            {sending && (
+              <div className="chat-message bot">
+                <div className="chat-bubble typing-indicator">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="chat-input">

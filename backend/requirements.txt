@@ -11,7 +11,8 @@ fiona>=1.9.0
 # Chat/LLM dependencies
 langchain>=0.1.0
 langchain-openai>=0.0.5
-langgraph>=0.0.20
+langgraph>=0.2.0
+langgraph-checkpoint>=2.0.0
 chromadb>=0.4.0
 duckdb>=0.9.0
 pandas>=2.0.0

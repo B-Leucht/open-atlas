@@ -734,9 +734,14 @@ def chat():
     Send a natural language query to the AI agent.
     The agent finds relevant datasets and analyzes them.
 
+    Request body:
+    - query: The user's question (required)
+    - thread_id: Conversation thread ID for history (optional, new thread created if not provided)
+
     Returns structured response including:
     - answer: The text response
     - query_type: "single_dataset", "multi_dataset", or "index_creation"
+    - thread_id: The conversation thread ID (use this in subsequent requests)
     - index_result: Full index data (if index_creation query)
     - geo_data: Geographic data for map display (if available)
     """
@@ -749,8 +754,11 @@ def chat():
         if not query:
             return jsonify({'success': False, 'error': 'Query cannot be empty'}), 400
 
+        # Get optional thread_id for conversation continuity
+        thread_id = data.get('thread_id')
+
         agent = get_chat_agent()
-        result = agent.query(query)
+        result = agent.query(query, thread_id=thread_id)
 
         # Build response with structured data
         response = {
@@ -758,6 +766,7 @@ def chat():
             'query': query,
             'answer': result.get('answer', ''),
             'query_type': result.get('query_type', 'single_dataset'),
+            'thread_id': result.get('thread_id'),
         }
 
         # Include index result if available (for map visualization)
