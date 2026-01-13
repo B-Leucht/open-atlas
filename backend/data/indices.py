@@ -432,11 +432,13 @@ class IndexCalculator:
             if not dataset_id:
                 skipped_components.append({
                     "label": comp.label or comp.dataset_pattern,
-                    "reason": "Dataset not found"
+                    "reason": "Dataset not found",
+                    "pattern": comp.dataset_pattern
                 })
-                logger.warning(f"Skipping component '{comp.label}': dataset '{comp.dataset_pattern}' not found")
+                logger.warning(f"Skipping component '{comp.label}': dataset pattern '{comp.dataset_pattern}' not found")
                 continue
 
+            logger.info(f"Processing component '{comp.label}': dataset_id={dataset_id}, column={comp.column}, aggregation={comp.aggregation}")
             # Get dataset description
             description = self._get_dataset_description(dataset_id)
 
@@ -458,11 +460,46 @@ class IndexCalculator:
                     "dataset_id": dataset_id  # Include dataset ID for fetching features
                 })
             else:
+                # Try to diagnose why no data was returned
+                reason = "No district-level data found"
+                with self.db.get_connection() as conn:
+                    # Check if dataset has any features
+                    cursor = conn.execute("SELECT COUNT(*) FROM features WHERE dataset_id = ?", (dataset_id,))
+                    feature_count = cursor.fetchone()[0]
+                    if feature_count == 0:
+                        reason = f"Dataset has no features"
+                    else:
+                        # Check if any features have district assignment
+                        cursor = conn.execute("""
+                            SELECT COUNT(*) FROM features f
+                            LEFT JOIN districts d ON f.district_id = d.id
+                            WHERE f.dataset_id = ?
+                            AND (f.district_id IS NOT NULL
+                                 OR json_extract(f.properties, '$._district_number') IS NOT NULL
+                                 OR json_extract(f.properties, '$.Raumbezug') IS NOT NULL)
+                        """, (dataset_id,))
+                        district_features = cursor.fetchone()[0]
+                        if district_features == 0:
+                            reason = f"No features have district assignment ({feature_count} total features)"
+                        elif comp.column:
+                            # Check if column exists in any feature
+                            cursor = conn.execute(f"""
+                                SELECT COUNT(*) FROM features f
+                                WHERE f.dataset_id = ?
+                                AND json_extract(f.properties, '$."{comp.column}"') IS NOT NULL
+                            """, (dataset_id,))
+                            col_count = cursor.fetchone()[0]
+                            if col_count == 0:
+                                reason = f"Column '{comp.column}' not found in any of {feature_count} features"
+                            else:
+                                reason = f"Column '{comp.column}' exists in {col_count}/{feature_count} features but no valid district data"
+
                 skipped_components.append({
                     "label": comp.label or comp.dataset_pattern,
-                    "reason": "No district-level data found"
+                    "reason": reason,
+                    "dataset_id": dataset_id
                 })
-                logger.warning(f"Skipping component '{comp.label}': no district-level data for dataset '{dataset_id}'")
+                logger.warning(f"Skipping component '{comp.label}': {reason} (dataset_id={dataset_id})")
 
         if not component_values:
             return {"success": False, "error": "No data available for any component"}
@@ -552,46 +589,50 @@ class IndexCalculator:
             return {}
 
         with self.db.get_connection() as conn:
+            # Use consistent district extraction for both count and value queries
+            district_expr = """COALESCE(
+                        d.number,
+                        json_extract(f.properties, '$._district_number'),
+                        SUBSTR(json_extract(f.properties, '$.Raumbezug'), 1, 2)
+                    )"""
+
             if comp.column is None or comp.aggregation == "count":
-                # Count features per district - try district_id first, fall back to Raumbezug
-                cursor = conn.execute("""
+                # Count features per district
+                cursor = conn.execute(f"""
                     SELECT
-                        COALESCE(
-                            d.number,
-                            SUBSTR(json_extract(f.properties, '$.Raumbezug'), 1, 2)
-                        ) as district_num,
+                        {district_expr} as district_num,
                         COUNT(f.id) as value
                     FROM features f
                     LEFT JOIN districts d ON f.district_id = d.id
                     WHERE f.dataset_id = ?
                     AND (
                         f.district_id IS NOT NULL
+                        OR json_extract(f.properties, '$._district_number') IS NOT NULL
                         OR (json_extract(f.properties, '$.Raumbezug') IS NOT NULL
                             AND json_extract(f.properties, '$.Raumbezug') != 'Stadt München')
                     )
-                    GROUP BY district_num
-                    HAVING district_num IS NOT NULL AND district_num != ''
+                    GROUP BY {district_expr}
+                    HAVING {district_expr} IS NOT NULL AND {district_expr} != ''
                 """, (dataset_id,))
             else:
                 year_filter = f"AND json_extract(f.properties, '$.Jahr') = '{year}'" if year else ""
                 agg_func = {"sum": "SUM", "avg": "AVG", "min": "MIN", "max": "MAX"}.get(comp.aggregation, "AVG")
-                # Extract district number from Raumbezug (first 2 chars) or _district_number
+
                 cursor = conn.execute(f"""
                     SELECT
-                        COALESCE(
-                            json_extract(f.properties, '$._district_number'),
-                            SUBSTR(json_extract(f.properties, '$.Raumbezug'), 1, 2)
-                        ) as district_num,
+                        {district_expr} as district_num,
                         {agg_func}(CAST(json_extract(f.properties, '$."{comp.column}"') AS REAL)) as value
                     FROM features f
+                    LEFT JOIN districts d ON f.district_id = d.id
                     WHERE f.dataset_id = ? {year_filter}
                     AND (
-                        json_extract(f.properties, '$._district_number') IS NOT NULL
+                        f.district_id IS NOT NULL
+                        OR json_extract(f.properties, '$._district_number') IS NOT NULL
                         OR (json_extract(f.properties, '$.Raumbezug') IS NOT NULL
                             AND json_extract(f.properties, '$.Raumbezug') != 'Stadt München')
                     )
-                    GROUP BY district_num
-                    HAVING district_num IS NOT NULL AND district_num != ''
+                    GROUP BY {district_expr}
+                    HAVING {district_expr} IS NOT NULL AND {district_expr} != ''
                 """, (dataset_id,))
 
             raw_counts = {row[0]: float(row[1]) for row in cursor.fetchall() if row[0] and row[1] is not None}
@@ -639,25 +680,30 @@ class IndexCalculator:
 
         with self.db.get_connection() as conn:
             # Build query based on whether it's a count or value aggregation
+            # Use consistent district extraction for both count and value queries
+            district_expr = """COALESCE(
+                        d.number,
+                        json_extract(f.properties, '$._district_number'),
+                        SUBSTR(json_extract(f.properties, '$.Raumbezug'), 1, 2)
+                    )"""
+
             if comp.column is None or comp.aggregation == "count":
-                # Count features per district - try district_id first, fall back to Raumbezug
-                cursor = conn.execute("""
+                # Count features per district
+                cursor = conn.execute(f"""
                     SELECT
-                        COALESCE(
-                            d.number,
-                            SUBSTR(json_extract(f.properties, '$.Raumbezug'), 1, 2)
-                        ) as district_num,
+                        {district_expr} as district_num,
                         COUNT(f.id) as value
                     FROM features f
                     LEFT JOIN districts d ON f.district_id = d.id
                     WHERE f.dataset_id = ?
                     AND (
                         f.district_id IS NOT NULL
+                        OR json_extract(f.properties, '$._district_number') IS NOT NULL
                         OR (json_extract(f.properties, '$.Raumbezug') IS NOT NULL
                             AND json_extract(f.properties, '$.Raumbezug') != 'Stadt München')
                     )
-                    GROUP BY district_num
-                    HAVING district_num IS NOT NULL AND district_num != ''
+                    GROUP BY {district_expr}
+                    HAVING {district_expr} IS NOT NULL AND {district_expr} != ''
                 """, (dataset_id,))
             else:
                 # Aggregate a specific column (for Indikatorenatlas data)
@@ -671,30 +717,54 @@ class IndexCalculator:
                     "max": "MAX"
                 }.get(comp.aggregation, "AVG")
 
-                # Extract district number from Raumbezug (first 2 chars) or _district_number
+                logger.info(f"Component '{comp.label}': aggregating column '{comp.column}' with {agg_func}")
+
+                # First, debug: check what data looks like for this dataset
+                debug_cursor = conn.execute(f"""
+                    SELECT
+                        json_extract(f.properties, '$.Raumbezug') as raumbezug,
+                        json_extract(f.properties, '$._district_number') as district_num_prop,
+                        json_extract(f.properties, '$."{comp.column}"') as col_value,
+                        f.district_id
+                    FROM features f
+                    WHERE f.dataset_id = ?
+                    LIMIT 5
+                """, (dataset_id,))
+                debug_rows = debug_cursor.fetchall()
+                logger.info(f"Component '{comp.label}': sample data: {debug_rows}")
+
                 cursor = conn.execute(f"""
                     SELECT
-                        COALESCE(
-                            json_extract(f.properties, '$._district_number'),
-                            SUBSTR(json_extract(f.properties, '$.Raumbezug'), 1, 2)
-                        ) as district_num,
+                        {district_expr} as district_num,
                         {agg_func}(CAST(json_extract(f.properties, '$."{comp.column}"') AS REAL)) as value
                     FROM features f
+                    LEFT JOIN districts d ON f.district_id = d.id
                     WHERE f.dataset_id = ?
                     {year_filter}
                     AND (
-                        json_extract(f.properties, '$._district_number') IS NOT NULL
+                        f.district_id IS NOT NULL
+                        OR json_extract(f.properties, '$._district_number') IS NOT NULL
                         OR (json_extract(f.properties, '$.Raumbezug') IS NOT NULL
                             AND json_extract(f.properties, '$.Raumbezug') != 'Stadt München')
                     )
-                    GROUP BY district_num
-                    HAVING district_num IS NOT NULL AND district_num != ''
+                    GROUP BY {district_expr}
+                    HAVING {district_expr} IS NOT NULL AND {district_expr} != ''
                 """, (dataset_id,))
 
             raw_values = {}
-            for row in cursor.fetchall():
+            all_rows = cursor.fetchall()
+            null_value_count = 0
+            for row in all_rows:
                 if row[0] and row[1] is not None:
                     raw_values[row[0]] = float(row[1])
+                elif row[0] and row[1] is None:
+                    null_value_count += 1
+
+            if null_value_count > 0:
+                logger.warning(f"Component '{comp.label}': {null_value_count} districts had NULL values (column '{comp.column}' may not exist)")
+
+            if not raw_values and all_rows:
+                logger.warning(f"Component '{comp.label}': query returned {len(all_rows)} rows but all had NULL values or NULL district_num")
 
         logger.info(f"Component '{comp.label}': raw values from {len(raw_values)} districts, sample: {dict(list(raw_values.items())[:3])}")
 

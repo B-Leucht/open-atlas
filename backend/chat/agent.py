@@ -357,7 +357,7 @@ class ChatAgent:
         user_query = self._get_last_user_message(state)
 
         # Search for more datasets for multi-dataset analysis
-        hits = self.vector_store.search(user_query, n_results=5)
+        hits = self.vector_store.search(user_query, n_results=10)
 
         if not hits:
             return {**state, "selected_datasets": []}
