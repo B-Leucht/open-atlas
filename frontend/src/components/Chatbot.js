@@ -202,6 +202,15 @@ export default function Chatbot({ onIndexResult, onGeoData }) {
                 </div>
               </div>
             ))}
+            {sending && (
+              <div className="chat-message bot">
+                <div className="chat-bubble typing-indicator">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="chat-input">
