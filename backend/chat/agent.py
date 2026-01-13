@@ -2,17 +2,20 @@
 LLM Agent for Munich Open Data analysis
 Uses LangGraph for workflow, DuckDB for SQL execution
 Integrates with data layer for districts and cached datasets
+Supports conversation history via LangGraph checkpointing
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import uuid
 from typing import Any, Dict, List, Optional, TypedDict
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from langchain_openai import ChatOpenAI
 from langgraph.graph import END, StateGraph
+from langgraph.checkpoint.memory import MemorySaver
 
 from .vector_store import VectorStore
 from .tools import (
@@ -26,6 +29,9 @@ from .tools import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Global memory store for conversation persistence
+_memory_store = MemorySaver()
 
 
 class AgentState(TypedDict):
@@ -101,19 +107,29 @@ class ChatAgent:
 
         return self._districts_cache
 
-    def query(self, user_query: str) -> Dict[str, Any]:
+    def query(self, user_query: str, thread_id: Optional[str] = None) -> Dict[str, Any]:
         """
         Process a user query and return structured response.
+
+        Args:
+            user_query: The user's question
+            thread_id: Optional conversation thread ID for history persistence.
+                      If None, a new thread is created (no history).
 
         Returns:
             {
                 "answer": str,
                 "query_type": str,
+                "thread_id": str - the conversation thread ID
                 "index_result": Optional[Dict] - for index_creation queries
                 "suggested_index": Optional[Dict] - index spec for index_creation
                 "geo_data": Optional[Dict] - for queries with geographic results
             }
         """
+        # Generate new thread_id if not provided
+        if not thread_id:
+            thread_id = str(uuid.uuid4())
+
         state: AgentState = {
             "messages": [HumanMessage(content=user_query)],
             "query_type": None,
@@ -127,7 +143,9 @@ class ChatAgent:
             "index_result": None,
         }
 
-        final_state = self.graph.invoke(state)
+        # Invoke with thread config for checkpointing
+        config = {"configurable": {"thread_id": thread_id}}
+        final_state = self.graph.invoke(state, config)
 
         # Extract final AI message
         answer = "I could not generate an answer."
@@ -141,6 +159,7 @@ class ChatAgent:
         response = {
             "answer": answer,
             "query_type": final_state.get("query_type", "single_dataset"),
+            "thread_id": thread_id,
         }
 
         # Include index data if this was an index creation query
@@ -224,7 +243,7 @@ class ChatAgent:
         # Terminal edge
         graph.add_edge("generate_answer", END)
 
-        return graph.compile()
+        return graph.compile(checkpointer=_memory_store)
 
     def _get_last_user_message(self, state: AgentState) -> str:
         """Extract the last user message from state"""
