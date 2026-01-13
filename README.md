@@ -48,14 +48,15 @@ open-atlas/
 ├── frontend/
 │   ├── src/
 │   │   ├── App.js             # Main application
-│   │   ├── components/
-│   │   │   ├── MapView.js     # Interactive map with choropleth
-│   │   │   ├── DistrictDataSelector.js  # Index selection UI
-│   │   │   ├── Chatbot.js     # AI chat interface
-│   │   │   ├── ResultsList.js # Search results
-│   │   │   └── ...
-│   │   └── ...
+│   │   ├── index.js           # React entry point
+│   │   └── components/
+│   │       ├── MapView.js     # Interactive map with choropleth
+│   │       ├── Chatbot.js     # AI chat interface
+│   │       └── Tooltip.js     # UI tooltips
 │   └── package.json
+├── doc/                       # Development scripts & analysis
+│   ├── analysis.py            # Database statistics generator
+│   └── chaos_map.py           # Data visualization generator
 ├── start.sh                   # Quick start script
 └── README.md
 ```
@@ -113,21 +114,29 @@ The frontend will open at `http://localhost:3000`
 
 ## API Endpoints
 
-### Search & Data
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/search` | GET | Search across all datasets |
-| `/api/categories` | GET | Get available categories |
-| `/api/stats` | GET | Database statistics |
-| `/api/datasets` | GET | List all datasets |
-| `/api/datasets/<id>/features` | GET | Get features from a dataset |
-
 ### Districts
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/districts` | GET | Get all district boundaries |
-| `/api/districts/<number>` | GET | Get single district |
-| `/api/districts/<number>/data` | GET | Get data for a district |
+| `/api/districts` | GET | Get all districts as GeoJSON |
+| `/api/districts/<id>` | GET | Get specific district |
+| `/api/districts/<id>/datasets` | GET | Get datasets in district |
+| `/api/districts/stats` | GET | Get district statistics |
+| `/api/districts/aggregate` | GET | Aggregate dataset by district |
+
+### Datasets
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v2/datasets` | GET | List datasets (filterable) |
+| `/api/v2/datasets/search` | GET | Semantic search datasets |
+| `/api/v2/datasets/<id>` | GET | Get dataset details |
+| `/api/v2/datasets/<id>/features` | GET | Get features as GeoJSON |
+| `/api/v2/stats` | GET | Database statistics |
+
+### Spatial Queries
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v2/features/near` | GET | Features near a point |
+| `/api/v2/features/in-district/<id>` | GET | Features in a district |
 
 ### Composite Indices
 | Endpoint | Method | Description |
@@ -137,19 +146,36 @@ The frontend will open at `http://localhost:3000`
 | `/api/indices/calculate/<id>` | GET | Calculate a preset index |
 | `/api/indices/calculate` | POST | Calculate a custom index |
 | `/api/indices/datasets` | GET | Datasets available for indices |
+| `/api/indices/datasets/<id>/columns` | GET | Get dataset columns |
+
+### Sync
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/sync/status` | GET | Get sync status |
+| `/api/sync/districts` | POST | Sync district boundaries |
+| `/api/sync/start` | POST | Start full data sync |
 
 ### Chat
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/chat` | POST | Send message to AI chatbot |
+| `/api/chat` | POST | Send query to AI agent |
+| `/api/chat/sync-vectors` | POST | Sync vector store |
+
+### Other
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/health` | GET | Health check |
+| `/api/sources` | GET | List data sources |
 
 ## Composite Indices
 
 The application includes pre-built composite indices that score each district:
 
-- **Child-Friendly**: Playgrounds, childcare facilities, traffic calming, safety
-- **Senior-Friendly**: Senior centers, healthcare access, accessibility
-- **Public Services**: WiFi, toilets, recycling, community centers
+- **Child-Friendly**: Playgrounds, schools, childcare, traffic calming, safety metrics
+- **Senior-Friendly**: Senior centers, doctor/pharmacy density, care facilities
+- **Greenness**: Green spaces, bike lanes, cycling infrastructure
+- **Entertainment**: Cultural facilities, swimming pools, tourist POIs, markets
+- **Public Services**: WiFi, toilets, recycling, community centers, social services
 
 Each index combines multiple datasets with configurable weights and normalization (per capita, per area, etc.).
 

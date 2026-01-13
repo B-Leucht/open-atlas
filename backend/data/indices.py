@@ -3,7 +3,7 @@ Composite Index Calculator for Open Atlas
 Enables creating district-level indices by combining multiple datasets with weights.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 from enum import Enum
 import logging
@@ -58,23 +58,15 @@ CHILD_FRIENDLY_INDEX = IndexPreset(
         IndexComponent(
             dataset_pattern="Öffentliche Spielplätze",
             column=None,
-            weight=0.25,
+            weight=0.20,
             aggregation="count",
             normalize=NormalizationType.POPULATION,
             label="Playgrounds"
         ),
         IndexComponent(
-            dataset_pattern="Kindertagesbetreuungseinrichtungen",
-            column=None,
-            weight=0.25,
-            aggregation="count",
-            normalize=NormalizationType.POPULATION,
-            label="Childcare facilities"
-        ),
-        IndexComponent(
             dataset_pattern="Tempo-30-Zone",
             column=None,
-            weight=0.15,
+            weight=0.10,
             aggregation="count",
             normalize=NormalizationType.AREA,
             label="Traffic calming"
@@ -82,7 +74,7 @@ CHILD_FRIENDLY_INDEX = IndexPreset(
         IndexComponent(
             dataset_pattern="Gefahrenstellen",
             column=None,
-            weight=-0.15,
+            weight=-0.10,
             aggregation="count",
             normalize=NormalizationType.AREA,
             label="Danger spots (inverse)"
@@ -90,11 +82,27 @@ CHILD_FRIENDLY_INDEX = IndexPreset(
         IndexComponent(
             dataset_pattern="Kinderbetreuung - Betreuungsangebot",
             column="Indikatorwert",
-            weight=0.20,
+            weight=0.15,
             aggregation="avg",
-            normalize=NormalizationType.MINMAX,
+            normalize=NormalizationType.POPULATION,
             label="Childcare availability"
         ),
+        IndexComponent(
+            dataset_pattern="Schulen und Schüler*innenzahlen in München",
+            column=None,
+            weight=0.20,
+            aggregation="count",
+            normalize=NormalizationType.POPULATION,
+            label="Schools"
+        ),
+        IndexComponent(
+            dataset_pattern="Monatszahlen Verkehrsunfälle",
+            column=None,
+            weight=-0.10,
+            aggregation="count",
+            normalize=NormalizationType.AREA,
+            label="Traffic accidents (inverse)"
+        )
     ]
 )
 
@@ -116,7 +124,7 @@ SENIOR_FRIENDLY_INDEX = IndexPreset(
         IndexComponent(
             dataset_pattern="Arzt*Ärztin-Dichte",
             column="Indikatorwert",
-            weight=0.25,
+            weight=-0.25,
             aggregation="avg",
             normalize=NormalizationType.MINMAX,
             label="Doctor density"
@@ -124,18 +132,10 @@ SENIOR_FRIENDLY_INDEX = IndexPreset(
         IndexComponent(
             dataset_pattern="Apotheken-Dichte",
             column="Indikatorwert",
-            weight=0.15,
+            weight=-0.15,
             aggregation="avg",
             normalize=NormalizationType.MINMAX,
             label="Pharmacy density"
-        ),
-        IndexComponent(
-            dataset_pattern="Behindertenparkplätze",
-            column=None,
-            weight=0.15,
-            aggregation="count",
-            normalize=NormalizationType.AREA,
-            label="Accessible parking"
         ),
         IndexComponent(
             dataset_pattern="Vollstationäre Pflegeeinrichtungen",
@@ -144,8 +144,108 @@ SENIOR_FRIENDLY_INDEX = IndexPreset(
             aggregation="count",
             normalize=NormalizationType.POPULATION,
             label="Care facilities"
-        ),
+        )
     ]
+)
+
+GREENNESS_INDEX = IndexPreset(
+    id="greenness",
+    name = "Greenness",
+    description = "measures how green a certain district is.",
+    icon = "🌲",
+    higher_is_better = True,
+    components = [
+        IndexComponent(
+            dataset_pattern = "Stadtgüter Stadt München",
+            column = None,
+            weight = 0.2,
+            aggregation = "count",
+            normalize = NormalizationType.AREA,
+            label = "Green spaces"
+        ),
+        IndexComponent(
+            dataset_pattern ="Öffentliche Spielplätze München",
+            column = None,
+            weight = 0.05,
+            aggregation = "count",
+            normalize = NormalizationType.AREA,
+            label = "Playgrounds"
+        ),
+        IndexComponent(
+            dataset_pattern="Radlstadtplan (Fahrradstraßen)",
+            column = None,
+            weight = 0.25,
+            aggregation = "count",
+            normalize = NormalizationType.AREA,
+            label = "Bike lanes"
+        ),
+        IndexComponent(
+            dataset_pattern ="Radlstadtplan (Radwege)",
+            column = None,
+            weight = 0.2,
+            aggregation = "count",
+            normalize = NormalizationType.AREA,
+            label = "Pedestrian roads"
+        )
+]
+)
+
+ENTERTAINMENT_INDEX = IndexPreset(
+    id = "entertainment",
+    name = "Entertainment",
+    description = "Entertainment services per disctrict",
+    icon = "🍿",
+    higher_is_better = True,
+    components = [
+        IndexComponent(
+            dataset_pattern="Städtische Kultureinrichtungen",
+            column = None,
+            weight = 0.2,
+            aggregation = "count",
+            normalize = NormalizationType.POPULATION,
+            label = "Culture facilities"
+        ),
+        IndexComponent(
+            dataset_pattern="Schwimmbäder in München",
+            column = None,
+            weight = 0.1,
+            aggregation="count",
+            normalize = NormalizationType.POPULATION,
+            label = "Swimming pools"
+        ),
+        IndexComponent(
+            dataset_pattern="Baden in der Isar",
+            column= None,
+            weight  =0.1,
+            aggregation="count",
+            normalize = NormalizationType.AREA,
+            label = "Swimming Areas Isar"
+        ),
+        IndexComponent(
+            dataset_pattern="Touristische Points of Interests (POI) München",
+            column = None,
+            weight = 0.2,
+            aggregation="count",
+            normalize = NormalizationType.AREA,
+            label = "Touristic points of interest"
+        ),
+        IndexComponent(
+            dataset_pattern="Märkte der Landeshauptstadt München",
+            column =None,
+            weight = 0.1,
+            aggregation="count",
+            normalize = NormalizationType.AREA,
+            label = "Markets"
+        ),
+        IndexComponent(
+            dataset_pattern = "Weihnachtsmärkte München",
+            column = None,
+            weight = 0.1,
+            aggregation= "count",
+            normalize = NormalizationType.AREA,
+            label = "Christmas Markets"
+        ),
+]
 )
 
 SERVICES_INDEX = IndexPreset(
@@ -203,6 +303,8 @@ INDEX_PRESETS = {
     "child-friendly": CHILD_FRIENDLY_INDEX,
     "senior-friendly": SENIOR_FRIENDLY_INDEX,
     "services": SERVICES_INDEX,
+    "greenness": GREENNESS_INDEX,
+    "entertainment": ENTERTAINMENT_INDEX
 }
 
 
@@ -318,8 +420,12 @@ class IndexCalculator:
         # Calculate raw values for each component
         component_values: List[Dict[str, float]] = []
         raw_component_values: List[Dict[str, float]] = []  # Pre-normalization values
+        successful_components: List[IndexComponent] = []  # Track which components have data
         component_info: List[Dict[str, Any]] = []
         skipped_components: List[Dict[str, Any]] = []
+
+        # Map to store dataset descriptions for breakdown
+        component_descriptions: Dict[str, Optional[str]] = {}
 
         for comp in components:
             dataset_id = self._resolve_dataset_id(comp.dataset_pattern)
@@ -333,10 +439,14 @@ class IndexCalculator:
                 continue
 
             logger.info(f"Processing component '{comp.label}': dataset_id={dataset_id}, column={comp.column}, aggregation={comp.aggregation}")
+            # Get dataset description
+            description = self._get_dataset_description(dataset_id)
 
             values = self._calculate_component(comp, districts, year)
             if values:
                 component_values.append(values)
+                successful_components.append(comp)
+                component_descriptions[comp.label or comp.dataset_pattern] = description
                 # Store raw values before any district-level normalization was applied
                 # Note: _calculate_component already applies normalization, so we need raw counts
                 raw_values = self._calculate_raw_component(comp, districts, year)
@@ -395,7 +505,7 @@ class IndexCalculator:
             return {"success": False, "error": "No data available for any component"}
 
         # Combine components into final scores with breakdown
-        final_scores, breakdown = self._combine_components_with_breakdown(components, component_values, raw_component_values, districts)
+        final_scores, breakdown = self._combine_components_with_breakdown(successful_components, component_values, raw_component_values, districts, component_descriptions)
 
         # Build response
         return {
@@ -725,12 +835,23 @@ class IndexCalculator:
 
         return values
 
+    def _get_dataset_description(self, dataset_id: str) -> Optional[str]:
+        """Get description for a dataset"""
+        with self.db.get_connection() as conn:
+            cursor = conn.execute(
+                "SELECT description FROM datasets WHERE id = ?",
+                (dataset_id,)
+            )
+            row = cursor.fetchone()
+            return row[0] if row else None
+
     def _combine_components_with_breakdown(
         self,
         components: List[IndexComponent],
         component_values: List[Dict[str, float]],
         raw_values: List[Dict[str, float]],
-        districts: List[Dict[str, Any]]
+        districts: List[Dict[str, Any]],
+        descriptions: Optional[Dict[str, str]] = None
     ) -> Tuple[Dict[str, float], Dict[str, List[Dict[str, Any]]]]:
         """Combine multiple components into a final score with per-district breakdown"""
         district_nums = [d["number"] for d in districts]
@@ -738,16 +859,18 @@ class IndexCalculator:
         # Normalize all component values to 0-100 scale for fair combination
         normalized_components = []
         for values in component_values:
-            if values:
-                min_val = min(values.values()) if values else 0
-                max_val = max(values.values()) if values else 0
+            # Add missing districts with value 0 so they participate in normalization
+            full_values = {dn: values.get(dn, 0) for dn in district_nums}
+            if full_values:
+                min_val = min(full_values.values())
+                max_val = max(full_values.values())
                 if max_val > min_val:
                     normalized = {
                         k: ((v - min_val) / (max_val - min_val)) * 100
-                        for k, v in values.items()
+                        for k, v in full_values.items()
                     }
                 else:
-                    normalized = {k: 50 for k in values}
+                    normalized = {k: 50 for k in full_values}
                 normalized_components.append(normalized)
             else:
                 normalized_components.append({})
@@ -763,7 +886,7 @@ class IndexCalculator:
 
             for i, comp in enumerate(components):
                 if i < len(normalized_components):
-                    raw_value = normalized_components[i].get(district_num, 50)
+                    raw_value = normalized_components[i].get(district_num, 0)
                     # Negative weight means inverse (higher raw = lower score)
                     effective_value = 100 - raw_value if comp.weight < 0 else raw_value
                     contribution = effective_value * abs(comp.weight)
@@ -778,8 +901,10 @@ class IndexCalculator:
                     raw_count = raw_data.get("count", 0)
                     raw_denominator = raw_data.get("denominator")
 
+                    label = comp.label or comp.dataset_pattern
                     district_breakdown.append({
-                        "label": comp.label or comp.dataset_pattern,
+                        "label": label,
+                        "description": descriptions.get(label) if descriptions else None,
                         "value": round(raw_value, 1),
                         "count": round(raw_count),
                         "denominator": round(raw_denominator, 1) if raw_denominator else None,
@@ -792,7 +917,7 @@ class IndexCalculator:
             if weight_sum > 0:
                 final_scores[district_num] = score / weight_sum
             else:
-                final_scores[district_num] = 50
+                final_scores[district_num] = 0
 
             breakdown[district_num] = district_breakdown
 
@@ -800,9 +925,11 @@ class IndexCalculator:
 
     def get_available_datasets(self) -> List[Dict[str, Any]]:
         """Get datasets that can be used in custom indices"""
+        import json
+
         with self.db.get_connection() as conn:
             cursor = conn.execute("""
-                SELECT id, title, feature_count, is_district_specific, has_geometry, description
+                SELECT id, title, feature_count, is_district_specific, has_geometry, description, groups
                 FROM datasets
                 WHERE feature_count > 0
                 ORDER BY
@@ -810,14 +937,23 @@ class IndexCalculator:
                     title
             """)
 
-            return [
-                {
+            results = []
+            for row in cursor.fetchall():
+                groups = []
+                if row[6]:
+                    try:
+                        groups = json.loads(row[6])
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+
+                results.append({
                     "id": row[0],
                     "title": row[1],
                     "feature_count": row[2],
                     "is_district_specific": bool(row[3]),
                     "has_geometry": bool(row[4]),
                     "description": row[5],
-                }
-                for row in cursor.fetchall()
-            ]
+                    "groups": groups,
+                })
+
+            return results

@@ -117,6 +117,10 @@ class VectorStore:
         if not ids:
             return 0
 
+        # Truncate documents to fit model context length (~512 tokens)
+        max_chars = 1500
+        documents = [doc[:max_chars] if len(doc) > max_chars else doc for doc in documents]
+
         # Compute embeddings
         embeddings = self.embedding_fn(documents)
 
@@ -135,7 +139,8 @@ class VectorStore:
                filters: Dict[str, Any] = None) -> List[Dict[str, Any]]:
         """
         Semantic search over datasets.
-        Returns list of metadata dicts sorted by relevance.
+        Returns list of metadata dicts sorted by relevance, with _distance scores.
+        Lower distance = more relevant (cosine distance).
         """
         collection = self.get_collection(collection_name)
 
@@ -150,10 +155,20 @@ class VectorStore:
         result = collection.query(
             query_embeddings=[query_embedding],
             n_results=n_results,
-            where=where
+            where=where,
+            include=["metadatas", "distances"]
         )
 
         metadatas = result.get("metadatas", [[]])[0] or []
+        distances = result.get("distances", [[]])[0] or []
+
+        # Add distance scores to metadata
+        for i, metadata in enumerate(metadatas):
+            if i < len(distances):
+                # Convert distance to similarity score (1 - distance for cosine)
+                metadata["_distance"] = distances[i]
+                metadata["_similarity"] = max(0, 1 - distances[i])
+
         return metadatas
 
     def sync_from_database(self, db=None) -> int:

@@ -19,7 +19,7 @@ from matplotlib.collections import LineCollection
 import numpy as np
 
 # Database path
-DB_PATH = Path(__file__).parent / "backend" / "data" / "openatlas.db"
+DB_PATH = Path(__file__).parent.parent / "backend" / "data" / "openatlas.db"
 
 # Munich coordinate bounds
 MUNICH_WGS84 = {'min_lon': 11.35, 'max_lon': 11.80, 'min_lat': 48.02, 'max_lat': 48.28}

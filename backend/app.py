@@ -3,8 +3,6 @@ from flask_cors import CORS
 import threading
 import logging
 from typing import List, Dict, Any, Optional
-from functools import lru_cache
-from datetime import datetime
 
 # Configure logging to show INFO level messages
 logging.basicConfig(
@@ -482,6 +480,83 @@ def get_local_dataset(dataset_id):
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+
+@app.route('/api/v2/datasets/search', methods=['GET'])
+def search_datasets():
+    """
+    Semantic search over datasets using vector store.
+
+    Params:
+        q: Search query (required)
+        limit: Max results (default 20, max 100)
+        district_only: If 'true', only return district-specific datasets
+        geo_only: If 'true', only return datasets with geometry
+
+    Returns datasets ranked by semantic relevance with scores.
+    """
+    try:
+        query = request.args.get('q', '').strip()
+        if not query:
+            return jsonify({'success': False, 'error': 'Query parameter q is required'}), 400
+
+        limit = min(request.args.get('limit', 20, type=int), 100)
+        district_only = request.args.get('district_only', 'false') == 'true'
+        geo_only = request.args.get('geo_only', 'false') == 'true'
+
+        # Build filters for vector store
+        filters = {}
+        if district_only:
+            filters['is_district_specific'] = True
+        if geo_only:
+            filters['has_geometry'] = True
+
+        # Search using vector store (semantic search)
+        vector_store = get_vector_store()
+        results = vector_store.search(
+            query=query,
+            n_results=limit,
+            filters=filters if filters else None
+        )
+
+        # Enrich results with full dataset info from database
+        db = get_db()
+        enriched_results = []
+
+        for hit in results:
+            dataset_id = hit.get('id')
+            if not dataset_id:
+                continue
+
+            # Get full dataset from database
+            dataset = db.get_dataset_by_external_id('munich', dataset_id)
+            if dataset:
+                result = dataset.to_dict()
+                # Add search metadata
+                result['_search_score'] = hit.get('_distance', 0)
+                enriched_results.append(result)
+            else:
+                # Fallback to vector store metadata
+                enriched_results.append({
+                    'id': dataset_id,
+                    'external_id': dataset_id,
+                    'title': hit.get('title', ''),
+                    'description': hit.get('description', ''),
+                    'has_geometry': hit.get('has_geometry', False),
+                    'is_district_specific': hit.get('is_district_specific', False),
+                    '_search_score': hit.get('_distance', 0)
+                })
+
+        return jsonify({
+            'success': True,
+            'query': query,
+            'count': len(enriched_results),
+            'datasets': enriched_results
+        })
+
+    except Exception as e:
+        logging.error(f"Search error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/api/v2/datasets/<dataset_id>/features', methods=['GET'])
 def get_dataset_features(dataset_id):
     """Get features for a dataset as GeoJSON"""
@@ -706,13 +781,23 @@ def sync_vector_store():
     """Sync vector store from local database"""
     try:
         from chat.vector_store import VectorStore
+
+        # Check if we should clear first (e.g., after changing embedding models)
+        clear_first = request.args.get('clear', 'false') == 'true'
+
         store = VectorStore()
+
+        if clear_first:
+            store.clear()
+            logging.info("Cleared vector store before sync")
+
         count = store.sync_from_database(get_db())
 
         return jsonify({
             'success': True,
             'message': f'Synced {count} datasets to vector store',
-            'count': count
+            'count': count,
+            'cleared': clear_first
         })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -783,6 +868,7 @@ def index():
             },
             'Datasets': {
                 'GET /api/v2/datasets': 'List datasets (params: source, geo, district_specific, limit)',
+                'GET /api/v2/datasets/search': 'Semantic search (params: q, limit, district_only, geo_only)',
                 'GET /api/v2/datasets/:id': 'Get dataset details',
                 'GET /api/v2/datasets/:id/features': 'Get dataset features as GeoJSON',
                 'GET /api/v2/stats': 'Get local database statistics'

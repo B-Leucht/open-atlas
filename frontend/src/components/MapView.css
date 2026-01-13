@@ -131,7 +131,7 @@
 /* Choropleth legend */
 .choropleth-legend {
   position: absolute;
-  bottom: 50px;
+  bottom: 90px;
   right: 10px;
   background: rgba(255, 255, 255, 0.95);
   padding: 10px 14px;
