@@ -118,6 +118,9 @@ function App() {
   const [selectedDistrict, setSelectedDistrict] = useState(null);
   const [districtData, setDistrictData] = useState(null);
 
+  // Mobile sidebar
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
   // Map data from index components
   const [mapFeatures, setMapFeatures] = useState([]);
   const [datasetMetadata, setDatasetMetadata] = useState({});
@@ -229,6 +232,7 @@ function App() {
     setLoading(true);
     setSelectedPreset(presetId);
     setSelectedDistrict(null);
+    setSidebarOpen(false); // Close sidebar on mobile
 
     try {
       const response = await axios.get(`${API_URL}/indices/calculate/${presetId}`);
@@ -268,6 +272,7 @@ function App() {
         applyIndexResult(response.data);
         await loadComponentFeatures(response.data.components);
         setShowCustomBuilder(false);
+        setSidebarOpen(false); // Close sidebar on mobile
       }
     } catch (error) {
       console.error('Error calculating custom index:', error);
@@ -478,8 +483,17 @@ function App() {
 
   return (
     <div className="app">
+      {/* Mobile Sidebar Toggle */}
+      <button
+        className={`sidebar-toggle ${sidebarOpen ? 'shifted' : ''}`}
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+        aria-label={sidebarOpen ? 'Close menu' : 'Open menu'}
+      >
+        {sidebarOpen ? '◀' : '▶'}
+      </button>
+
       {/* Side Panel */}
-      <div className="side-panel">
+      <div className={`side-panel ${sidebarOpen ? 'open' : ''}`}>
         <div className="panel-header">
           <h1>{t.title}</h1>
           <button className="lang-toggle" onClick={toggleLang}>

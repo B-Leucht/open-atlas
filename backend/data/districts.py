@@ -5,7 +5,6 @@ Handles district boundary ingestion and spatial operations
 
 import json
 import logging
-import uuid
 from math import cos, radians
 from typing import Any, Dict, List, Optional, Tuple
 

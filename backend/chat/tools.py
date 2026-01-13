@@ -243,7 +243,7 @@ def select_best_resource(resources: List[Dict[str, Any]]) -> Optional[Dict[str, 
 def generate_sql(user_query: str, columns: List[str], preview_md: str,
                  table_name: str, spatial: bool = False) -> str:
     """Generate SQL query using LLM"""
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.1)
+    llm = ChatOpenAI(model="gpt-5-mini", temperature=0.1)
 
     spatial_hint = ""
     if spatial:
@@ -518,7 +518,7 @@ def classify_query(user_query: str) -> Dict[str, Any]:
             "confidence": float
         }
     """
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.0)
+    llm = ChatOpenAI(model="gpt-5-mini", temperature=0.0)
 
     system_msg = AIMessage(content="""You classify user queries about Munich open data into exactly ONE category.
 
@@ -667,7 +667,7 @@ def analyze_multiple_datasets(
 
 def _synthesize_multi_results(results: List[Dict[str, Any]], user_query: str) -> str:
     """Use LLM to synthesize insights from multiple dataset analyses"""
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.1)
+    llm = ChatOpenAI(model="gpt-5-mini", temperature=0.1)
 
     # Build context from results
     results_text = ""
@@ -720,6 +720,8 @@ def _create_summary_table(results: List[Dict[str, Any]]) -> str:
 # INDEX DESIGN AND CALCULATION
 # =============================================================================
 
+import concurrent.futures
+
 # Normalization suggestion rules
 NORMALIZATION_RULES = {
     "population": [
@@ -739,16 +741,249 @@ NORMALIZATION_RULES = {
 }
 
 
+def _select_relevant_from_batch(
+    user_query: str,
+    batch: List[Dict[str, Any]],
+    batch_index: int
+) -> List[str]:
+    """
+    Process a single batch of datasets and return IDs of relevant ones.
+
+    Args:
+        user_query: The user's index creation query
+        batch: List of dataset dicts to evaluate
+        batch_index: Index of this batch (for logging)
+
+    Returns:
+        List of dataset IDs that are relevant for the query
+    """
+    llm = ChatOpenAI(model="gpt-5-mini", temperature=0.0)
+
+    # Format batch with rich details
+    batch_text = "\n\n".join([
+        f"[{d['id']}] {d['title']}\n"
+        f"  Features: {d.get('feature_count', 0)} data points\n"
+        f"  District-specific: {'Yes' if d.get('is_district_specific') else 'No'}\n"
+        f"  Description: {(d.get('description') or 'No description available')[:250]}"
+        for d in batch
+    ])
+
+    prompt = f"""You are selecting datasets for creating a district ranking index.
+
+User Query: "{user_query}"
+
+Review each dataset below and determine if it could be relevant for answering this query.
+Include datasets that are DIRECTLY relevant (e.g., playgrounds for family-friendliness)
+AND datasets that are INDIRECTLY relevant (e.g., traffic calming for safety).
+
+When in doubt, INCLUDE the dataset - it's better to have more options than to miss something useful.
+
+Datasets to review:
+{batch_text}
+
+Return a JSON array containing ONLY the IDs of relevant datasets.
+Example: ["dataset-id-1", "dataset-id-5", "dataset-id-8"]
+
+If none are relevant, return an empty array: []"""
+
+    try:
+        response = llm.invoke(prompt)
+        content = response.content.strip()
+
+        # Parse JSON response
+        if content.startswith("```"):
+            content = content.split("```")[1]
+            if content.startswith("json"):
+                content = content[4:]
+        content = content.strip()
+
+        selected_ids = json.loads(content)
+
+        if not isinstance(selected_ids, list):
+            logger.warning(f"Batch {batch_index}: Expected list, got {type(selected_ids)}")
+            return []
+
+        logger.info(f"Batch {batch_index}: Selected {len(selected_ids)}/{len(batch)} datasets as relevant")
+        return selected_ids
+
+    except Exception as e:
+        logger.error(f"Batch {batch_index} selection failed: {e}")
+        # On error, return all IDs from batch to avoid losing potentially relevant datasets
+        return [d['id'] for d in batch]
+
+
+def _select_best_datasets(
+    user_query: str,
+    relevant_datasets: List[Dict[str, Any]],
+    max_datasets: int = 10
+) -> List[Dict[str, Any]]:
+    """
+    From all relevant datasets, select the best ones for the index.
+
+    Args:
+        user_query: The user's index creation query
+        relevant_datasets: Pre-filtered list of relevant datasets
+        max_datasets: Maximum number of datasets to select (default 10)
+
+    Returns:
+        List of the best datasets for the index (up to max_datasets)
+    """
+    if len(relevant_datasets) <= max_datasets:
+        logger.info(f"Only {len(relevant_datasets)} relevant datasets, using all")
+        return relevant_datasets
+
+    llm = ChatOpenAI(model="gpt-5-mini", temperature=0.0)
+
+    # Format all relevant datasets
+    dataset_text = "\n\n".join([
+        f"[{i+1}] {d['title']} (ID: {d['id']})\n"
+        f"    Features: {d.get('feature_count', 0)} | District-specific: {'Yes' if d.get('is_district_specific') else 'No'}\n"
+        f"    Description: {(d.get('description') or 'No description')[:200]}"
+        for i, d in enumerate(relevant_datasets)
+    ])
+
+    prompt = f"""You are finalizing dataset selection for a district ranking index.
+
+User Query: "{user_query}"
+
+From these {len(relevant_datasets)} relevant datasets, select the TOP {max_datasets} that will create the most meaningful and balanced index.
+
+Selection criteria:
+1. DIVERSITY: Cover different aspects of the query (e.g., for "family-friendly": include education, safety, recreation, healthcare)
+2. DATA QUALITY: Prefer datasets with more features and district-specific data
+3. DIRECT RELEVANCE: Prioritize datasets that directly measure what the user is asking about
+4. COMPLEMENTARY: Avoid selecting multiple datasets that measure the same thing
+
+Available datasets:
+{dataset_text}
+
+Return a JSON array with the numbers (1-{len(relevant_datasets)}) of your top {max_datasets} selections, ordered by importance.
+Example: [3, 7, 1, 12, 5, 9, 2, 15, 8, 4]"""
+
+    try:
+        response = llm.invoke(prompt)
+        content = response.content.strip()
+
+        # Parse JSON
+        if content.startswith("```"):
+            content = content.split("```")[1]
+            if content.startswith("json"):
+                content = content[4:]
+        content = content.strip()
+
+        selected_indices = json.loads(content)
+
+        if not isinstance(selected_indices, list):
+            logger.warning(f"Expected list of indices, got {type(selected_indices)}")
+            return relevant_datasets[:max_datasets]
+
+        # Convert 1-indexed to 0-indexed and get datasets
+        best_datasets = []
+        for idx in selected_indices[:max_datasets]:
+            if isinstance(idx, int) and 1 <= idx <= len(relevant_datasets):
+                best_datasets.append(relevant_datasets[idx - 1])
+
+        logger.info(f"Selected {len(best_datasets)} best datasets from {len(relevant_datasets)} relevant ones")
+        return best_datasets
+
+    except Exception as e:
+        logger.error(f"Best dataset selection failed: {e}")
+        # Fallback: return first max_datasets sorted by feature count
+        return sorted(relevant_datasets, key=lambda x: x.get('feature_count', 0), reverse=True)[:max_datasets]
+
+
+def select_datasets_for_index(
+    user_query: str,
+    available_datasets: List[Dict[str, Any]],
+    batch_size: int = 10,
+    max_final_datasets: int = 10
+) -> List[Dict[str, Any]]:
+    """
+    Two-stage dataset selection for index creation:
+    1. Parallel batch processing to find ALL relevant datasets (no limit)
+    2. Final selection to pick the best ones (limited to max_final_datasets)
+
+    Args:
+        user_query: The user's index creation query
+        available_datasets: All datasets from the database
+        batch_size: Number of datasets per batch for parallel processing
+        max_final_datasets: Maximum datasets in final selection
+
+    Returns:
+        List of selected datasets for index design
+    """
+    # Filter to datasets with features
+    useful_datasets = [d for d in available_datasets if d.get('feature_count', 0) > 0]
+    logger.info(f"Starting dataset selection: {len(useful_datasets)} datasets with features")
+
+    if len(useful_datasets) <= max_final_datasets:
+        logger.info(f"Only {len(useful_datasets)} datasets available, using all")
+        return useful_datasets
+
+    # Stage 1: Parallel batch selection to find ALL relevant datasets
+    batches = [
+        useful_datasets[i:i + batch_size]
+        for i in range(0, len(useful_datasets), batch_size)
+    ]
+    logger.info(f"Stage 1: Processing {len(batches)} batches of ~{batch_size} datasets each")
+
+    # Process batches in parallel using ThreadPoolExecutor
+    all_relevant_ids = set()
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(batches), 5)) as executor:
+        # Submit all batch jobs
+        future_to_batch = {
+            executor.submit(_select_relevant_from_batch, user_query, batch, i): i
+            for i, batch in enumerate(batches)
+        }
+
+        # Collect results as they complete
+        for future in concurrent.futures.as_completed(future_to_batch):
+            batch_idx = future_to_batch[future]
+            try:
+                selected_ids = future.result()
+                all_relevant_ids.update(selected_ids)
+            except Exception as e:
+                logger.error(f"Batch {batch_idx} raised exception: {e}")
+                # On error, include all datasets from that batch
+                all_relevant_ids.update(d['id'] for d in batches[batch_idx])
+
+    # Get full dataset objects for relevant IDs
+    relevant_datasets = [d for d in useful_datasets if d['id'] in all_relevant_ids]
+    logger.info(f"Stage 1 complete: {len(relevant_datasets)}/{len(useful_datasets)} datasets marked as relevant")
+
+    if len(relevant_datasets) == 0:
+        logger.warning("No datasets marked as relevant, falling back to top datasets by feature count")
+        return sorted(useful_datasets, key=lambda x: x.get('feature_count', 0), reverse=True)[:max_final_datasets]
+
+    # Stage 2: Select the best datasets from relevant ones
+    logger.info(f"Stage 2: Selecting top {max_final_datasets} from {len(relevant_datasets)} relevant datasets")
+    best_datasets = _select_best_datasets(user_query, relevant_datasets, max_final_datasets)
+
+    logger.info(f"Dataset selection complete: {len(best_datasets)} datasets selected")
+    for d in best_datasets:
+        logger.info(f"  - {d['title']} ({d.get('feature_count', 0)} features)")
+
+    return best_datasets
+
+
 def design_index(
     user_query: str,
-    available_datasets: List[Dict[str, Any]]
+    available_datasets: List[Dict[str, Any]],
+    use_batch_selection: bool = True
 ) -> Dict[str, Any]:
     """
-    AI-driven index design with sensible defaults.
+    AI-driven index design with two-stage dataset selection.
+
+    Stage 1: Parallel batch processing to find ALL relevant datasets
+    Stage 2: Select best 10 datasets from relevant ones
+    Stage 3: Design the index using selected datasets
 
     Args:
         user_query: User's question (e.g., "Which district is best for families?")
         available_datasets: List of datasets from IndexCalculator.get_available_datasets()
+        use_batch_selection: If True, use two-stage batch selection (default).
+                            If False, use all datasets (legacy behavior).
 
     Returns:
         {
@@ -756,24 +991,48 @@ def design_index(
             "description": str,
             "components": List of component specs,
             "higher_is_better": bool,
-            "reasoning": str
+            "reasoning": str,
+            "selection_info": dict with selection statistics
         }
     """
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.2)
+    llm = ChatOpenAI(model="gpt-5-mini", temperature=0.2)
 
-    # Filter to datasets that actually have features and are useful for indices
-    useful_datasets = [d for d in available_datasets if d.get('feature_count', 0) > 0]
-    logger.info(f"design_index: {len(useful_datasets)} datasets with features (from {len(available_datasets)} total)")
+    # Use two-stage batch selection for better dataset filtering
+    if use_batch_selection:
+        logger.info(f"design_index: Using two-stage batch selection")
+        selected_datasets = select_datasets_for_index(
+            user_query=user_query,
+            available_datasets=available_datasets,
+            batch_size=10,
+            max_final_datasets=10
+        )
+        selection_info = {
+            "total_available": len(available_datasets),
+            "selected_count": len(selected_datasets),
+            "method": "two_stage_batch_selection"
+        }
+    else:
+        # Legacy behavior: use all datasets with features
+        selected_datasets = [d for d in available_datasets if d.get('feature_count', 0) > 0]
+        selection_info = {
+            "total_available": len(available_datasets),
+            "selected_count": len(selected_datasets),
+            "method": "all_datasets"
+        }
 
-    # Format available datasets for the prompt
+    logger.info(f"design_index: {len(selected_datasets)} datasets selected for index design")
+
+    # Format selected datasets with rich details for the final design prompt
     dataset_list = "\n".join([
-        f"- {d['title']} (ID: {d['id']}, {d['feature_count']} features)"
-        for d in useful_datasets[:50]  # Limit to avoid token overflow
+        f"- {d['title']}\n"
+        f"  ID: {d['id']} | Features: {d.get('feature_count', 0)} | District-specific: {'Yes' if d.get('is_district_specific') else 'No'}\n"
+        f"  Description: {(d.get('description') or 'No description')[:150]}"
+        for d in selected_datasets
     ])
 
     system_msg = AIMessage(content="""You design composite indices for ranking Munich districts.
 
-TASK: Create an index that answers the user's question by combining 3-6 relevant datasets.
+TASK: Create an index that answers the user's question by combining 3-10 relevant datasets.
 
 OUTPUT FORMAT (JSON only):
 {
@@ -851,6 +1110,9 @@ Return ONLY valid JSON.""")
         for comp in result["components"]:
             logger.info(f"  - pattern='{comp.get('dataset_pattern')}', weight={comp.get('weight')}")
 
+        # Add selection info to result
+        result["selection_info"] = selection_info
+
         return result
 
     except Exception as e:
@@ -861,7 +1123,8 @@ Return ONLY valid JSON.""")
             "higher_is_better": True,
             "components": [],
             "reasoning": f"Design failed: {str(e)}",
-            "error": str(e)
+            "error": str(e),
+            "selection_info": selection_info
         }
 
 
