@@ -152,3 +152,4 @@ workspaces.db
 /backend/chatbot-backend/data/
 /backend/chatbot-backend/cache/
 backend/data/.chroma/
+
