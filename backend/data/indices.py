@@ -7,6 +7,11 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 from enum import Enum
 import logging
+import json
+
+from shapely.geometry import shape
+from shapely.ops import transform
+from pyproj import Transformer
 
 from .database import Database
 
@@ -22,6 +27,13 @@ class NormalizationType(Enum):
     ZSCORE = "zscore"       # Standard deviations from mean
 
 
+class MeasureType(Enum):
+    """How to measure features - by count, area, or length"""
+    COUNT = "count"         # Count number of features (default)
+    AREA = "area"           # Sum of geometry areas (in m²)
+    LENGTH = "length"       # Sum of geometry lengths (in m)
+
+
 @dataclass
 class IndexComponent:
     """A single component of a composite index"""
@@ -31,6 +43,7 @@ class IndexComponent:
     aggregation: str = "sum"  # count, sum, avg, min, max
     normalize: NormalizationType = NormalizationType.MINMAX
     label: str = ""         # Human-readable label
+    measure_by: MeasureType = MeasureType.COUNT  # How to measure: count, area, or length
 
 
 @dataclass
@@ -173,19 +186,21 @@ GREENNESS_INDEX = IndexPreset(
         ),
         IndexComponent(
             dataset_pattern="Radlstadtplan (Fahrradstraßen)",
-            column = None,
-            weight = 0.25,
-            aggregation = "count",
-            normalize = NormalizationType.AREA,
-            label = "Bike lanes"
+            column=None,
+            weight=0.25,
+            aggregation="sum",
+            normalize=NormalizationType.AREA,
+            label="Bike lanes",
+            measure_by=MeasureType.AREA  # Sum of bike lane area in m² (stored as Polygons)
         ),
         IndexComponent(
-            dataset_pattern ="Radlstadtplan (Radwege)",
-            column = None,
-            weight = 0.2,
-            aggregation = "count",
-            normalize = NormalizationType.AREA,
-            label = "Pedestrian roads"
+            dataset_pattern="Radlstadtplan (Radwege)",
+            column=None,
+            weight=0.2,
+            aggregation="sum",
+            normalize=NormalizationType.AREA,
+            label="Bike paths",
+            measure_by=MeasureType.LENGTH  # Sum of bike path length in m
         )
 ]
 )
@@ -215,11 +230,12 @@ ENTERTAINMENT_INDEX = IndexPreset(
         ),
         IndexComponent(
             dataset_pattern="Baden in der Isar",
-            column= None,
-            weight  =0.1,
-            aggregation="count",
-            normalize = NormalizationType.AREA,
-            label = "Swimming Areas Isar"
+            column=None,
+            weight=0.1,
+            aggregation="sum",
+            normalize=NormalizationType.AREA,
+            label="Swimming Areas Isar",
+            measure_by=MeasureType.AREA  # Sum of swimming area in m²
         ),
         IndexComponent(
             dataset_pattern="Touristische Points of Interests (POI) München",
@@ -249,6 +265,7 @@ ENTERTAINMENT_INDEX = IndexPreset(
 )
 
 SERVICES_INDEX = IndexPreset(
+
     id="services",
     name="Public Services",
     description="Access to public services and amenities",
@@ -315,11 +332,104 @@ INDEX_PRESETS = {
 class IndexCalculator:
     """Calculate composite indices from multiple datasets"""
 
+    # Transformer for converting WGS84 to UTM zone 32N (Munich area) for accurate measurements
+    _wgs84_to_utm = Transformer.from_crs("EPSG:4326", "EPSG:32632", always_xy=True)
+
     def __init__(self, db: Database = None):
         self.db = db or Database()
         self._population_cache: Dict[str, float] = {}
         self._area_cache: Dict[str, float] = {}
         self._dataset_id_cache: Dict[str, str] = {}
+
+    def _calculate_geometry_measure(self, geometry_json: str, measure_type: MeasureType) -> float:
+        """
+        Calculate area (m²) or length (m) from a GeoJSON geometry string.
+        Uses UTM projection for accurate measurements in Munich area.
+        """
+        if not geometry_json or measure_type == MeasureType.COUNT:
+            return 0.0
+
+        try:
+            geom_dict = json.loads(geometry_json) if isinstance(geometry_json, str) else geometry_json
+            geom = shape(geom_dict)
+
+            # Transform to UTM for accurate measurements
+            projected_geom = transform(self._wgs84_to_utm.transform, geom)
+
+            if measure_type == MeasureType.AREA:
+                return projected_geom.area  # Returns m²
+            elif measure_type == MeasureType.LENGTH:
+                return projected_geom.length  # Returns m
+            return 0.0
+        except Exception as e:
+            logger.debug(f"Could not calculate geometry measure: {e}")
+            return 0.0
+
+    def _calculate_geometry_values_by_district(
+        self,
+        dataset_id: str,
+        measure_type: MeasureType
+    ) -> Dict[str, float]:
+        """
+        Calculate sum of area or length for all features in a dataset, grouped by district.
+        Returns dict of district_number -> total area/length in m² or m.
+
+        For AREA: Only processes Polygon and MultiPolygon geometries.
+        For LENGTH: Only processes LineString and MultiLineString geometries.
+        """
+        if measure_type == MeasureType.COUNT:
+            return {}
+
+        district_values: Dict[str, float] = {}
+
+        # Filter by geometry type based on measure type
+        if measure_type == MeasureType.AREA:
+            geometry_type_filter = "AND f.geometry_type IN ('Polygon', 'MultiPolygon')"
+        elif measure_type == MeasureType.LENGTH:
+            geometry_type_filter = "AND f.geometry_type IN ('LineString', 'MultiLineString')"
+        else:
+            geometry_type_filter = ""
+
+        with self.db.get_connection() as conn:
+            cursor = conn.execute(f"""
+                SELECT
+                    COALESCE(
+                        d.number,
+                        SUBSTR(json_extract(f.properties, '$.Raumbezug'), 1, 2)
+                    ) as district_num,
+                    f.geometry
+                FROM features f
+                LEFT JOIN districts d ON f.district_id = d.id
+                WHERE f.dataset_id = ?
+                AND f.geometry IS NOT NULL
+                {geometry_type_filter}
+                AND (
+                    f.district_id IS NOT NULL
+                    OR (json_extract(f.properties, '$.Raumbezug') IS NOT NULL
+                        AND json_extract(f.properties, '$.Raumbezug') != 'Stadt München')
+                )
+            """, (dataset_id,))
+
+            for row in cursor.fetchall():
+                district_num = row[0]
+                geometry_json = row[1]
+
+                if not district_num or not geometry_json:
+                    continue
+
+                measure = self._calculate_geometry_measure(geometry_json, measure_type)
+                if measure > 0:
+                    district_values[district_num] = district_values.get(district_num, 0) + measure
+
+        # Log results
+        if measure_type == MeasureType.AREA:
+            total = sum(district_values.values()) if district_values else 0
+            logger.info(f"Calculated area for {len(district_values)} districts, total: {total:.0f} m² ({total/1000000:.3f} km²)")
+        elif measure_type == MeasureType.LENGTH:
+            total = sum(district_values.values()) if district_values else 0
+            logger.info(f"Calculated length for {len(district_values)} districts, total: {total:.0f} m ({total/1000:.2f} km)")
+
+        return district_values
 
     def _resolve_dataset_id(self, pattern: str) -> Optional[str]:
         """Resolve a title pattern or dataset ID to an actual dataset ID"""
@@ -676,6 +786,7 @@ class IndexCalculator:
             logger.warning(f"Could not find dataset matching pattern: '{comp.dataset_pattern}'")
             return {}
 
+
         logger.info(f"Calculating component '{comp.label}' using dataset '{dataset_id}'")
 
         with self.db.get_connection() as conn:
@@ -765,6 +876,7 @@ class IndexCalculator:
 
             if not raw_values and all_rows:
                 logger.warning(f"Component '{comp.label}': query returned {len(all_rows)} rows but all had NULL values or NULL district_num")
+
 
         logger.info(f"Component '{comp.label}': raw values from {len(raw_values)} districts, sample: {dict(list(raw_values.items())[:3])}")
 
