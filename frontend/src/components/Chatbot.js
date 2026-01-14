@@ -54,7 +54,7 @@ const MOCK_INDEX_RESULT = {
   breakdown: {}
 };
 
-export default function Chatbot({ onIndexResult, onGeoData }) {
+export default function Chatbot({ onIndexResult, onGeoData, isMobileModal = false, onClose = null }) {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState([
@@ -178,6 +178,67 @@ export default function Chatbot({ onIndexResult, onGeoData }) {
     }
   };
 
+  // Mobile full-screen modal mode
+  if (isMobileModal) {
+    return (
+      <div className="chatbot-modal">
+        <div className="chat-header">
+          <button className="chat-back-button" onClick={onClose} aria-label="Close chat">
+            ←
+          </button>
+          <div className="chat-title">Data Assistant</div>
+          <div className="chat-status">
+            {apiHealthy === null ? 'Checking...' : apiHealthy ? 'Connected' : 'Offline'}
+          </div>
+        </div>
+
+        <div className="chat-messages" ref={messagesRef}>
+          {messages.map(m => (
+            <div key={m.id} className={`chat-message ${m.sender}`}>
+              <div className="chat-bubble">
+                {m.sender === 'bot' ? (
+                  <div className="markdown-content">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.text}</ReactMarkdown>
+                  </div>
+                ) : (
+                  m.text
+                )}
+                {m.hasVisualization && (
+                  <div className="visualization-indicator">
+                    {m.queryType === 'index_creation' ? '📊 Index shown on map' : '📍 Data shown on map'}
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+          {sending && (
+            <div className="chat-message bot">
+              <div className="chat-bubble typing-indicator">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="chat-input">
+          <textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Ask about Munich data..."
+            rows={1}
+          />
+          <button className="chat-send" onClick={send} disabled={sending || !input.trim()}>
+            {sending ? '...' : 'Send'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Desktop floating widget mode
   return (
     <div className="chatbot">
       {open && (

@@ -114,6 +114,7 @@ function MapView({ results, datasetMetadata = {}, onMapMove, showDistricts = tru
   const [districts, setDistricts] = useState(null);
   const [selectedDistrict, setSelectedDistrict] = useState(null);
   const [hoveredDistrict, setHoveredDistrict] = useState(null);
+  const [layersExpanded, setLayersExpanded] = useState(false);
 
   // Fetch district boundaries
   useEffect(() => {
@@ -348,7 +349,7 @@ function MapView({ results, datasetMetadata = {}, onMapMove, showDistricts = tru
   }
 
   return (
-    <div className="map-view-wrapper">
+    <div className={`map-view-wrapper ${layersExpanded ? 'layers-visible' : ''}`}>
       <MapContainer
         center={munichCenter}
         zoom={12}
@@ -537,6 +538,17 @@ function MapView({ results, datasetMetadata = {}, onMapMove, showDistricts = tru
             <span>High</span>
           </div>
         </div>
+      )}
+
+      {/* Mobile layer toggle button */}
+      {Object.keys(groupedData).length > 0 && (
+        <button
+          className={`layers-toggle-btn ${layersExpanded ? 'active' : ''}`}
+          onClick={() => setLayersExpanded(!layersExpanded)}
+          aria-label={layersExpanded ? 'Hide layers' : 'Show layers'}
+        >
+          ◉
+        </button>
       )}
     </div>
   );
