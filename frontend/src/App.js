@@ -3,6 +3,7 @@ import axios from 'axios';
 import MapView from './components/MapView';
 import Chatbot from './components/Chatbot';
 import Tooltip from './components/Tooltip';
+import MobileBottomNav from './components/MobileBottomNav';
 import './App.css';
 
 const API_URL = process.env.REACT_APP_API_URL || '/api';
@@ -121,6 +122,11 @@ function App() {
   // Mobile sidebar
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  // Mobile navigation
+  const [activeTab, setActiveTab] = useState('map');
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 900);
+  const [chatModalOpen, setChatModalOpen] = useState(false);
+
   // Map data from index components
   const [mapFeatures, setMapFeatures] = useState([]);
   const [datasetMetadata, setDatasetMetadata] = useState({});
@@ -129,6 +135,52 @@ function App() {
     loadPresets();
     loadAvailableDatasets();
   }, []);
+
+  // Detect mobile/desktop viewport
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth <= 900;
+      setIsMobile(mobile);
+      // Reset states when switching to desktop
+      if (!mobile) {
+        setChatModalOpen(false);
+        setActiveTab('map');
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Handle mobile tab changes - double tap to close
+  const handleTabChange = useCallback((tab) => {
+    // If tapping the same tab again, go back to map
+    if (tab === activeTab && tab !== 'map') {
+      setActiveTab('map');
+      setSidebarOpen(false);
+      setChatModalOpen(false);
+      return;
+    }
+
+    setActiveTab(tab);
+
+    switch (tab) {
+      case 'map':
+        setSidebarOpen(false);
+        setChatModalOpen(false);
+        break;
+      case 'menu':
+        setSidebarOpen(true);
+        setChatModalOpen(false);
+        break;
+      case 'chat':
+        setSidebarOpen(false);
+        setChatModalOpen(true);
+        break;
+      default:
+        break;
+    }
+  }, [activeTab]);
 
   // Semantic search with debounce
   useEffect(() => {
@@ -232,7 +284,8 @@ function App() {
     setLoading(true);
     setSelectedPreset(presetId);
     setSelectedDistrict(null);
-    setSidebarOpen(false); // Close sidebar on mobile
+    setSidebarOpen(false);
+    if (isMobile) setActiveTab('map');
 
     try {
       const response = await axios.get(`${API_URL}/indices/calculate/${presetId}`);
@@ -246,7 +299,7 @@ function App() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isMobile]);
 
   const calculateCustomIndex = async () => {
     if (customComponents.length === 0) return;
@@ -272,7 +325,8 @@ function App() {
         applyIndexResult(response.data);
         await loadComponentFeatures(response.data.components);
         setShowCustomBuilder(false);
-        setSidebarOpen(false); // Close sidebar on mobile
+        setSidebarOpen(false);
+        if (isMobile) setActiveTab('map');
       }
     } catch (error) {
       console.error('Error calculating custom index:', error);
@@ -386,6 +440,11 @@ function App() {
         score: score,
         breakdown: breakdown
       });
+      // On mobile, open sidebar to show district details
+      if (isMobile) {
+        setSidebarOpen(true);
+        setActiveTab('menu');
+      }
     }
   };
 
@@ -480,6 +539,42 @@ function App() {
       .sort((a, b) => b[1] - a[1])
       .map(([name, count]) => ({ name, count }));
   }, [availableDatasets]);
+
+  // Calculate rankings for districts and components
+  const rankings = useMemo(() => {
+    if (!indexResult || !indexResult.scores) return null;
+
+    // Overall score rankings (higher is better, so rank 1 = highest score)
+    const scoreEntries = Object.entries(indexResult.scores)
+      .map(([num, score]) => ({ num: parseInt(num), score }))
+      .sort((a, b) => b.score - a.score);
+
+    const overallRanks = {};
+    scoreEntries.forEach((entry, idx) => {
+      overallRanks[entry.num] = idx + 1;
+    });
+
+    // Component rankings (for each component, rank districts by value)
+    const componentRanks = {};
+    if (indexResult.breakdown) {
+      const districtNums = Object.keys(indexResult.breakdown).map(n => parseInt(n));
+      const numComponents = indexResult.breakdown[districtNums[0]]?.length || 0;
+
+      for (let i = 0; i < numComponents; i++) {
+        const values = districtNums.map(num => ({
+          num,
+          value: indexResult.breakdown[num]?.[i]?.value ?? 0
+        })).sort((a, b) => b.value - a.value);
+
+        componentRanks[i] = {};
+        values.forEach((entry, idx) => {
+          componentRanks[i][entry.num] = idx + 1;
+        });
+      }
+    }
+
+    return { overall: overallRanks, components: componentRanks, total: scoreEntries.length };
+  }, [indexResult]);
 
   return (
     <div className="app">
@@ -707,7 +802,9 @@ function App() {
           <div className="district-detail">
             <div className="district-header">
               <h3>{selectedDistrict.name}</h3>
-              <span className="district-score">{selectedDistrict.score?.toFixed(0)}</span>
+              <span className="district-score">
+                #{rankings?.overall[selectedDistrict.number] || '?'}/{rankings?.total || 25}
+              </span>
             </div>
 
             <div className="breakdown-list">
@@ -747,7 +844,9 @@ function App() {
                         style={{ width: `${item.value}%` }}
                       />
                     </div>
-                    <div className="breakdown-value">{item.value.toFixed(0)}/100</div>
+                    <div className="breakdown-value">
+                      #{rankings?.components[i]?.[selectedDistrict.number] || '?'}/{rankings?.total || 25}
+                    </div>
                   </div>
                 );
               })}
@@ -775,11 +874,38 @@ function App() {
           districtData={showOverlay ? districtData : null}
           onDistrictClick={indexResult ? handleDistrictClick : null}
         />
+
+        {/* Desktop: Show floating chatbot */}
+        {!isMobile && (
+          <Chatbot
+            onIndexResult={applyIndexResult}
+            onGeoData={handleChatGeoData}
+          />
+        )}
+      </div>
+
+      {/* Mobile: Full-screen chat modal */}
+      {isMobile && chatModalOpen && (
         <Chatbot
           onIndexResult={applyIndexResult}
           onGeoData={handleChatGeoData}
+          isMobileModal={true}
+          onClose={() => {
+            setChatModalOpen(false);
+            setActiveTab('map');
+          }}
         />
-      </div>
+      )}
+
+      {/* Mobile Bottom Navigation */}
+      {isMobile && (
+        <MobileBottomNav
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
+          hasActiveIndex={!!indexResult}
+          lang={lang}
+        />
+      )}
     </div>
   );
 }
