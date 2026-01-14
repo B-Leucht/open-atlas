@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import threading
 from typing import Any, Dict, List, Optional
 
 import duckdb
@@ -16,6 +17,80 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langchain_openai import ChatOpenAI
 
 logger = logging.getLogger(__name__)
+
+
+class DuckDBConnectionManager:
+    """
+    Manages DuckDB connections with pre-loaded extensions to avoid
+    repeated installation/loading overhead on each query.
+    """
+
+    _instance = None
+    _lock = threading.Lock()
+
+    def __new__(cls):
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+                    cls._instance._initialized = False
+        return cls._instance
+
+    def __init__(self):
+        if self._initialized:
+            return
+        self._initialized = True
+        self._extensions_installed = False
+        self._install_lock = threading.Lock()
+
+    def _ensure_extensions_installed(self):
+        """Install extensions once (they persist across connections)"""
+        if self._extensions_installed:
+            return
+
+        with self._install_lock:
+            if self._extensions_installed:
+                return
+
+            try:
+                # Install extensions globally using duckdb module-level functions
+                # This avoids the "cannot change setting while running" error
+                duckdb.install_extension("httpfs")
+                duckdb.install_extension("spatial")
+                self._extensions_installed = True
+                logger.info("DuckDB extensions installed (httpfs, spatial)")
+            except Exception as e:
+                # Extensions might already be installed, which is fine
+                logger.debug(f"Extension installation note: {e}")
+                self._extensions_installed = True
+
+    def get_connection(self, load_spatial: bool = False) -> duckdb.DuckDBPyConnection:
+        """
+        Get a new DuckDB connection with extensions loaded.
+
+        Args:
+            load_spatial: If True, load httpfs and spatial extensions
+
+        Returns:
+            A DuckDB connection ready for use
+        """
+        self._ensure_extensions_installed()
+
+        # Create connection with config that allows unsigned extensions
+        conn = duckdb.connect(config={'allow_unsigned_extensions': 'true'})
+
+        if load_spatial:
+            try:
+                conn.load_extension("httpfs")
+                conn.load_extension("spatial")
+            except Exception as e:
+                logger.warning(f"Failed to load spatial extensions: {e}")
+
+        return conn
+
+
+# Global connection manager singleton
+_duckdb_manager = DuckDBConnectionManager()
 
 
 def _extract_coordinates(df: pd.DataFrame, max_points: int = 200) -> Optional[List[Dict[str, float]]]:
@@ -287,7 +362,7 @@ def analyze_csv(url: str, user_query: str) -> Dict[str, Any]:
     Analyze CSV data with LLM-generated SQL.
     Downloads CSV, registers with DuckDB, generates and executes SQL.
     """
-    conn = duckdb.connect()
+    conn = _duckdb_manager.get_connection(load_spatial=False)
     try:
         # Download and register CSV
         try:
@@ -377,14 +452,8 @@ def analyze_geospatial(url: str, user_query: str) -> Dict[str, Any]:
     Loads GeoJSON/WFS, generates and executes spatial SQL.
     """
     logger.info(f"analyze_geospatial called with url={url[:80]}...")
-    conn = duckdb.connect()
+    conn = _duckdb_manager.get_connection(load_spatial=True)
     try:
-        # Load extensions
-        conn.execute("SET allow_unsigned_extensions=true;")
-        duckdb.install_extension("httpfs")
-        duckdb.load_extension("httpfs")
-        duckdb.install_extension("spatial")
-        duckdb.load_extension("spatial")
 
         # Create view from geospatial file
         conn.execute("CREATE OR REPLACE VIEW geo AS SELECT * FROM ST_Read(?);", [url])
@@ -446,7 +515,7 @@ def query_tabular(url: str, sql_query: str) -> Dict[str, Any]:
     Execute a SQL query against a remote CSV using DuckDB.
     The table is registered as `tab`.
     """
-    conn = duckdb.connect()
+    conn = _duckdb_manager.get_connection(load_spatial=False)
     try:
         try:
             df = pd.read_csv(url)
@@ -490,13 +559,8 @@ def query_geospatial(url: str, sql_query: str) -> Dict[str, Any]:
     Execute a geospatial SQL query using DuckDB spatial.
     The data is registered as `geo`.
     """
-    conn = duckdb.connect()
+    conn = _duckdb_manager.get_connection(load_spatial=True)
     try:
-        conn.execute("SET allow_unsigned_extensions=true;")
-        duckdb.install_extension("httpfs")
-        duckdb.load_extension("httpfs")
-        duckdb.install_extension("spatial")
-        duckdb.load_extension("spatial")
 
         conn.execute("CREATE OR REPLACE VIEW geo AS SELECT * FROM ST_Read(?);", [url])
         result_df = conn.execute(sql_query).fetch_df()

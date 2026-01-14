@@ -257,7 +257,7 @@ function App() {
     return [];
   };
 
-  const loadComponentFeatures = async (components) => {
+  const loadComponentFeatures = useCallback(async (components) => {
     // Load geometric features from all datasets with geometry
     const allFeatures = [];
     const metadata = {};
@@ -291,64 +291,9 @@ function App() {
 
     setMapFeatures(allFeatures);
     setDatasetMetadata(metadata);
-  };
+  }, []);
 
-  const calculateIndex = useCallback(async (presetId) => {
-    setLoading(true);
-    setSelectedPreset(presetId);
-    setSelectedDistrict(null);
-    setSidebarOpen(false);
-    if (isMobile) setActiveTab('map');
-
-    try {
-      const response = await axios.get(`${API_URL}/indices/calculate/${presetId}`);
-      if (response.data.success) {
-        applyIndexResult(response.data);
-        // Load geometric features from component datasets
-        await loadComponentFeatures(response.data.components);
-      }
-    } catch (error) {
-      console.error('Error calculating index:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [isMobile]);
-
-  const calculateCustomIndex = async () => {
-    if (customComponents.length === 0) return;
-
-    setLoading(true);
-    setSelectedPreset(null);
-    setSelectedDistrict(null);
-
-    try {
-      const response = await axios.post(`${API_URL}/indices/calculate`, {
-        name: 'Custom Index',
-        components: customComponents.map(c => ({
-          dataset_id: c.dataset.id,
-          column: c.column || null,
-          weight: c.weight,
-          aggregation: c.aggregation,
-          normalize: c.normalize,
-          label: c.label || c.dataset.title.substring(0, 30)
-        }))
-      });
-
-      if (response.data.success) {
-        applyIndexResult(response.data);
-        await loadComponentFeatures(response.data.components);
-        setShowCustomBuilder(false);
-        setSidebarOpen(false);
-        if (isMobile) setActiveTab('map');
-      }
-    } catch (error) {
-      console.error('Error calculating custom index:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const applyIndexResult = (data, suggestedIndex) => {
+  const applyIndexResult = useCallback(async (data, suggestedIndex) => {
     setIndexResult(data);
 
     const mapData = {};
@@ -371,62 +316,176 @@ function App() {
 
     // Clear any preset selection since this came from chat
     setSelectedPreset(null);
+
+    // Load geometric features from component datasets (same as manual index creation)
+    if (data.components && data.components.length > 0) {
+      await loadComponentFeatures(data.components);
+    }
+  }, [loadComponentFeatures]);
+
+  const calculateIndex = useCallback(async (presetId) => {
+    setLoading(true);
+    setSelectedPreset(presetId);
+    setSelectedDistrict(null);
+    setSidebarOpen(false);
+    if (isMobile) setActiveTab('map');
+
+    try {
+      const response = await axios.get(`${API_URL}/indices/calculate/${presetId}`);
+      if (response.data.success) {
+        await applyIndexResult(response.data);
+      }
+    } catch (error) {
+      console.error('Error calculating index:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [isMobile, applyIndexResult]);
+
+  const calculateCustomIndex = async () => {
+    if (customComponents.length === 0) return;
+
+    setLoading(true);
+    setSelectedPreset(null);
+    setSelectedDistrict(null);
+
+    try {
+      const response = await axios.post(`${API_URL}/indices/calculate`, {
+        name: 'Custom Index',
+        components: customComponents.map(c => ({
+          dataset_id: c.dataset.id,
+          column: c.column || null,
+          weight: c.weight,
+          aggregation: c.aggregation,
+          normalize: c.normalize,
+          label: c.label || c.dataset.title.substring(0, 30)
+        }))
+      });
+
+      if (response.data.success) {
+        await applyIndexResult(response.data);
+        setShowCustomBuilder(false);
+        setSidebarOpen(false);
+        if (isMobile) setActiveTab('map');
+      }
+    } catch (error) {
+      console.error('Error calculating custom index:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Handle geographic data from chatbot
-  const handleChatGeoData = useCallback((geoData) => {
-    if (!geoData || !geoData.coordinates || !Array.isArray(geoData.coordinates)) {
-      console.log('No valid geo_data received:', geoData);
-      return;
-    }
+  // Helper to convert fallback coordinates to map features
+  const convertCoordinatesToFeatures = (coordinates, category) => {
+    if (!coordinates || !Array.isArray(coordinates)) return [];
 
-    console.log('Processing geo_data:', geoData.coordinates.length, 'coordinates');
-
-    // Convert chat geo data to map features format
-    // Coordinates come as {lat, lon} from the backend
-    const features = geoData.coordinates
+    return coordinates
       .filter(coord => {
-        // Validate coordinates
         const lat = coord.lat || coord.latitude;
         const lon = coord.lon || coord.longitude;
-        const valid = typeof lat === 'number' && typeof lon === 'number' &&
-                      !isNaN(lat) && !isNaN(lon) &&
-                      lat >= -90 && lat <= 90 &&
-                      lon >= -180 && lon <= 180;
-        if (!valid) {
-          console.log('Invalid coordinate:', coord);
-        }
-        return valid;
+        return typeof lat === 'number' && typeof lon === 'number' &&
+               !isNaN(lat) && !isNaN(lon) &&
+               lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180;
       })
       .map((coord, idx) => ({
         type: 'Feature',
         geometry: {
           type: 'Point',
-          // GeoJSON uses [longitude, latitude] order
           coordinates: [coord.lon || coord.longitude, coord.lat || coord.latitude]
         },
         properties: {
           name: coord.name || `Point ${idx + 1}`,
           ...(coord.properties || {})
         },
-        category: 'chat-result'
+        category
       }));
+  };
 
-    console.log('Created', features.length, 'valid features');
+  // Handle geographic data from chatbot
+  const handleChatGeoData = useCallback(async (geoData) => {
+    if (!geoData) {
+      console.log('No geo_data received');
+      return;
+    }
 
-    if (features.length > 0) {
-      setMapFeatures(features);
-      setDatasetMetadata({
-        'chat-result': {
-          title: geoData.dataset_title || 'Chat Results',
-          weight: 1
+    const categoryId = geoData.dataset_id || 'chat-result';
+    const title = geoData.dataset_title || 'Chat Results';
+
+    // EFFICIENT METHOD: Load features via dataset_id (same as index creation)
+    // With fallback to extracted coordinates if database has no features
+    if (geoData.type === 'dataset' && geoData.dataset_id) {
+      console.log('Loading features for dataset:', geoData.dataset_id);
+
+      try {
+        const response = await axios.get(`${API_URL}/v2/datasets/${geoData.dataset_id}/features`, {
+          params: { limit: 500 }
+        });
+
+        if (response.data.success && response.data.data?.features) {
+          const features = response.data.data.features
+            .filter(f => f.geometry) // Only features with geometry
+            .map(f => ({
+              ...f,
+              category: categoryId
+            }));
+
+          // If API returned features, use them (supports all geometry types)
+          if (features.length > 0) {
+            console.log(`Loaded ${features.length} features with all geometry types from database`);
+
+            setMapFeatures(features);
+            setDatasetMetadata({
+              [categoryId]: { title, weight: 1 }
+            });
+
+            setDistrictData(null);
+            setIndexResult(null);
+            setSelectedPreset(null);
+            return;
+          }
         }
-      });
+      } catch (error) {
+        console.error('Error loading dataset features from API:', error);
+      }
 
-      // Clear any district-based visualization to show only points
-      setDistrictData(null);
-      setIndexResult(null);
-      setSelectedPreset(null);
+      // FALLBACK: Use extracted coordinates if API returned no features
+      if (geoData.fallback_coordinates && geoData.fallback_coordinates.length > 0) {
+        console.log(`API returned no features, using ${geoData.fallback_coordinates.length} fallback coordinates`);
+
+        const features = convertCoordinatesToFeatures(geoData.fallback_coordinates, categoryId);
+        if (features.length > 0) {
+          setMapFeatures(features);
+          setDatasetMetadata({
+            [categoryId]: { title, weight: 1 }
+          });
+
+          setDistrictData(null);
+          setIndexResult(null);
+          setSelectedPreset(null);
+        }
+      }
+      return;
+    }
+
+    // LEGACY METHOD: Handle old coordinate-based format (backward compatibility)
+    if (geoData.coordinates && Array.isArray(geoData.coordinates)) {
+      console.log('Processing legacy coordinate-based geo_data:', geoData.coordinates.length, 'points');
+
+      const features = convertCoordinatesToFeatures(geoData.coordinates, 'chat-result');
+
+      if (features.length > 0) {
+        setMapFeatures(features);
+        setDatasetMetadata({
+          'chat-result': {
+            title: geoData.dataset_title || 'Chat Results',
+            weight: 1
+          }
+        });
+
+        setDistrictData(null);
+        setIndexResult(null);
+        setSelectedPreset(null);
+      }
     }
   }, []);
 
