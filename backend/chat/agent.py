@@ -170,17 +170,26 @@ class ChatAgent:
                 response["suggested_index"] = final_state.get("suggested_index")
 
         # Include geographic data from analysis results if available
+        # Hybrid approach: return dataset_id for efficient loading, with fallback coordinates
         analysis_result = final_state.get("analysis_result")
-        if analysis_result:
+        selected_dataset = final_state.get("selected_dataset")
+
+        if analysis_result and selected_dataset:
+            dataset_id = selected_dataset.get("id")
             coords = analysis_result.get("coordinates")
-            logger.info(f"Analysis result has coordinates: {coords is not None}, count: {len(coords) if coords else 0}")
-            if coords:
+
+            # Check if this dataset likely has geographic data
+            has_geo_data = coords is not None or analysis_result.get("kind") == "geospatial"
+
+            if has_geo_data and dataset_id:
                 response["geo_data"] = {
-                    "type": "points",
-                    "coordinates": coords,
-                    "dataset_title": final_state.get("selected_dataset", {}).get("title")
+                    "type": "dataset",
+                    "dataset_id": dataset_id,
+                    "dataset_title": selected_dataset.get("title"),
+                    # Include fallback coordinates for datasets not in features table
+                    "fallback_coordinates": coords
                 }
-                logger.info(f"Added geo_data with {len(coords)} coordinates")
+                logger.info(f"Added geo_data for dataset_id: {dataset_id}, fallback_coords: {len(coords) if coords else 0}")
 
         return response
 
