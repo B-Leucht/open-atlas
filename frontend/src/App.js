@@ -546,7 +546,7 @@ function App() {
 
     // Overall score rankings (higher is better, so rank 1 = highest score)
     const scoreEntries = Object.entries(indexResult.scores)
-      .map(([num, score]) => ({ num: parseInt(num), score }))
+      .map(([num, score]) => ({ num, score }))
       .sort((a, b) => b.score - a.score);
 
     const overallRanks = {};
@@ -557,8 +557,9 @@ function App() {
     // Component rankings (for each component, rank districts by value)
     const componentRanks = {};
     if (indexResult.breakdown) {
-      const districtNums = Object.keys(indexResult.breakdown).map(n => parseInt(n));
-      const numComponents = indexResult.breakdown[districtNums[0]]?.length || 0;
+      const districtNums = Object.keys(indexResult.breakdown);
+      const firstDistrict = districtNums[0];
+      const numComponents = indexResult.breakdown[firstDistrict]?.length || 0;
 
       for (let i = 0; i < numComponents; i++) {
         const values = districtNums.map(num => ({

@@ -189,10 +189,15 @@
 /* Mobile - reposition overlays above bottom nav */
 @media (max-width: 900px) {
   .map-info {
-    top: 10px;
-    max-width: 70%;
+    top: 0;
+    left: 0;
+    right: 0;
+    transform: none;
+    max-width: 100%;
     font-size: 0.7rem;
-    padding: 0.35rem 0.6rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
   }
 
   .choropleth-legend {
@@ -261,21 +266,24 @@
 
 @media (max-width: 480px) {
   .choropleth-legend {
-    min-width: 100px;
-    padding: 8px 10px;
+    top: auto;
+    bottom: calc(10px + var(--mobile-nav-height, 56px) + var(--safe-area-bottom, 0px));
+    left: 10px;
+    min-width: 90px;
+    padding: 6px 8px;
   }
 
   .legend-title {
-    font-size: 0.7rem;
-    margin-bottom: 6px;
+    font-size: 0.65rem;
+    margin-bottom: 4px;
   }
 
   .legend-labels {
-    font-size: 0.65rem;
+    font-size: 0.6rem;
   }
 
   .map-info {
-    font-size: 0.7rem;
-    padding: 0.35rem 0.7rem;
+    font-size: 0.65rem;
+    padding: 0.4rem 0.5rem;
   }
 }
