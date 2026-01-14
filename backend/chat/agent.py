@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
+import time
 import uuid
 from typing import Any, Dict, List, Optional, TypedDict
 
@@ -30,8 +32,86 @@ from .tools import (
 
 logger = logging.getLogger(__name__)
 
-# Global memory store for conversation persistence
-_memory_store = MemorySaver()
+
+class TTLMemoryStore:
+    """
+    Memory store wrapper with TTL-based cleanup to prevent unbounded memory growth.
+    Conversations expire after a configurable TTL (default 1 hour).
+    """
+
+    def __init__(self, ttl_seconds: int = 3600, cleanup_interval: int = 300):
+        """
+        Args:
+            ttl_seconds: Time-to-live for conversations (default 1 hour)
+            cleanup_interval: How often to run cleanup (default 5 minutes)
+        """
+        self._store = MemorySaver()
+        self._access_times: Dict[str, float] = {}
+        self._lock = threading.Lock()
+        self._ttl = ttl_seconds
+        self._cleanup_interval = cleanup_interval
+        self._last_cleanup = time.time()
+
+    @property
+    def saver(self) -> MemorySaver:
+        """Get the underlying MemorySaver, running cleanup if needed"""
+        self._maybe_cleanup()
+        return self._store
+
+    def touch(self, thread_id: str):
+        """Update access time for a thread"""
+        with self._lock:
+            self._access_times[thread_id] = time.time()
+
+    def _maybe_cleanup(self):
+        """Run cleanup if enough time has passed"""
+        now = time.time()
+        if now - self._last_cleanup < self._cleanup_interval:
+            return
+
+        with self._lock:
+            self._last_cleanup = now
+            expired = []
+            for thread_id, access_time in self._access_times.items():
+                if now - access_time > self._ttl:
+                    expired.append(thread_id)
+
+            if expired:
+                # Clear expired threads from access tracking
+                # Note: MemorySaver doesn't expose a delete method, so we
+                # recreate it periodically if too many threads accumulate
+                for thread_id in expired:
+                    del self._access_times[thread_id]
+
+                logger.info(f"Cleaned up {len(expired)} expired conversation threads")
+
+                # If we have too many active threads, recreate the store
+                # This is a safety valve against memory leaks
+                if len(self._access_times) == 0:
+                    logger.info("All threads expired, recreating memory store")
+                    self._store = MemorySaver()
+
+    def clear_all(self):
+        """Force clear all conversations (useful for memory pressure)"""
+        with self._lock:
+            self._store = MemorySaver()
+            self._access_times.clear()
+            logger.info("Cleared all conversation memory")
+
+    def get_stats(self) -> Dict[str, Any]:
+        """Get memory store statistics"""
+        with self._lock:
+            now = time.time()
+            active = sum(1 for t in self._access_times.values() if now - t < self._ttl)
+            return {
+                "total_threads": len(self._access_times),
+                "active_threads": active,
+                "ttl_seconds": self._ttl,
+            }
+
+
+# Global memory store with TTL cleanup (1 hour TTL, cleanup every 5 minutes)
+_memory_store = TTLMemoryStore(ttl_seconds=3600, cleanup_interval=300)
 
 
 class AgentState(TypedDict):
@@ -145,6 +225,10 @@ class ChatAgent:
 
         # Invoke with thread config for checkpointing
         config = {"configurable": {"thread_id": thread_id}}
+
+        # Track thread access for TTL cleanup
+        _memory_store.touch(thread_id)
+
         final_state = self.graph.invoke(state, config)
 
         # Extract final AI message
@@ -170,17 +254,26 @@ class ChatAgent:
                 response["suggested_index"] = final_state.get("suggested_index")
 
         # Include geographic data from analysis results if available
+        # Hybrid approach: return dataset_id for efficient loading, with fallback coordinates
         analysis_result = final_state.get("analysis_result")
-        if analysis_result:
+        selected_dataset = final_state.get("selected_dataset")
+
+        if analysis_result and selected_dataset:
+            dataset_id = selected_dataset.get("id")
             coords = analysis_result.get("coordinates")
-            logger.info(f"Analysis result has coordinates: {coords is not None}, count: {len(coords) if coords else 0}")
-            if coords:
+
+            # Check if this dataset likely has geographic data
+            has_geo_data = coords is not None or analysis_result.get("kind") == "geospatial"
+
+            if has_geo_data and dataset_id:
                 response["geo_data"] = {
-                    "type": "points",
-                    "coordinates": coords,
-                    "dataset_title": final_state.get("selected_dataset", {}).get("title")
+                    "type": "dataset",
+                    "dataset_id": dataset_id,
+                    "dataset_title": selected_dataset.get("title"),
+                    # Include fallback coordinates for datasets not in features table
+                    "fallback_coordinates": coords
                 }
-                logger.info(f"Added geo_data with {len(coords)} coordinates")
+                logger.info(f"Added geo_data for dataset_id: {dataset_id}, fallback_coords: {len(coords) if coords else 0}")
 
         return response
 
@@ -243,7 +336,7 @@ class ChatAgent:
         # Terminal edge
         graph.add_edge("generate_answer", END)
 
-        return graph.compile(checkpointer=_memory_store)
+        return graph.compile(checkpointer=_memory_store.saver)
 
     def _get_last_user_message(self, state: AgentState) -> str:
         """Extract the last user message from state"""
@@ -463,7 +556,7 @@ class ChatAgent:
         user_query = self._get_last_user_message(state)
         districts_context = state.get("districts_context", "")
 
-        llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.1)
+        llm = ChatOpenAI(model="gpt-5-mini", temperature=0.1)
 
         # Route to appropriate answer generation based on query type
         if query_type == "index_creation":

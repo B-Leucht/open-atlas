@@ -559,17 +559,29 @@ def search_datasets():
 
 @app.route('/api/v2/datasets/<dataset_id>/features', methods=['GET'])
 def get_dataset_features(dataset_id):
-    """Get features for a dataset as GeoJSON"""
+    """Get features for a dataset as GeoJSON
+
+    Handles both external_id (from vector store) and internal id (with munich_ prefix)
+    """
     try:
         db = get_db()
         limit = min(request.args.get('limit', 1000, type=int), 5000)
         district_id = request.args.get('district')
 
+        # Try with the provided ID first
         geojson = db.get_features_geojson(
             dataset_id=dataset_id,
             district_id=district_id,
             limit=limit
         )
+
+        # If no features found, try with munich_ prefix (handles external_id -> internal id)
+        if not geojson.get('features') and not dataset_id.startswith('munich_'):
+            geojson = db.get_features_geojson(
+                dataset_id=f'munich_{dataset_id}',
+                district_id=district_id,
+                limit=limit
+            )
 
         return jsonify({
             'success': True,
