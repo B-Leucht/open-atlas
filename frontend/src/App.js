@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import axios from 'axios';
 import MapView from './components/MapView';
 import Chatbot from './components/Chatbot';
@@ -131,6 +131,9 @@ function App() {
   const [mapFeatures, setMapFeatures] = useState([]);
   const [datasetMetadata, setDatasetMetadata] = useState({});
 
+  // Ref for auto-scrolling to district details on mobile
+  const districtDetailRef = useRef(null);
+
   useEffect(() => {
     loadPresets();
     loadAvailableDatasets();
@@ -151,6 +154,16 @@ function App() {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // Auto-scroll to district details on mobile when a district is selected
+  useEffect(() => {
+    if (isMobile && selectedDistrict && districtDetailRef.current) {
+      // Small delay to ensure the sidebar is open and rendered
+      setTimeout(() => {
+        districtDetailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    }
+  }, [isMobile, selectedDistrict]);
 
   // Handle mobile tab changes - double tap to close
   const handleTabChange = useCallback((tab) => {
@@ -800,7 +813,7 @@ function App() {
 
         {/* Selected District Breakdown */}
         {selectedDistrict && (
-          <div className="district-detail">
+          <div className="district-detail" ref={districtDetailRef}>
             <div className="district-header">
               <h3>{selectedDistrict.name}</h3>
               <span className="district-score">
