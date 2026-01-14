@@ -4,7 +4,7 @@ import remarkGfm from 'remark-gfm';
 import './Chatbot.css';
 
 // Use the same API as the rest of the app
-const API_BASE_URL = `http://${window.location.hostname}:5001/api`;
+const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
 
 // Mock data for testing without API
 const MOCK_INDEX_RESULT = {

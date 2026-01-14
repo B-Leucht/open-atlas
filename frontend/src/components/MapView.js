@@ -8,7 +8,7 @@ import './MapView.css';
 const { Overlay } = LayersControl;
 
 // API base URL
-const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5001';
+const API_BASE = process.env.REACT_APP_API_URL || '/api';
 
 function MapEventHandler({ onMapMove }) {
   useMapEvents({
@@ -121,7 +121,7 @@ function MapView({ results, datasetMetadata = {}, onMapMove, showDistricts = tru
 
     const fetchDistricts = async () => {
       try {
-        const response = await fetch(`${API_BASE}/api/districts`);
+        const response = await fetch(`${API_BASE}/districts`);
         if (response.ok) {
           const data = await response.json();
           if (data.success && data.data) {

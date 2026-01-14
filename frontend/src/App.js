@@ -5,7 +5,7 @@ import Chatbot from './components/Chatbot';
 import Tooltip from './components/Tooltip';
 import './App.css';
 
-const API_URL = `http://${window.location.hostname}:5001/api`;
+const API_URL = process.env.REACT_APP_API_URL || '/api';
 
 // Translations
 const TRANSLATIONS = {
