@@ -315,6 +315,61 @@ def select_best_resource(resources: List[Dict[str, Any]]) -> Optional[Dict[str, 
     return sorted(resources, key=score)[0]
 
 
+def _clean_sql_response(sql: str) -> str:
+    """Clean LLM response to extract raw SQL query."""
+    sql = sql.strip()
+
+    # Remove markdown code blocks if present
+    if sql.startswith("```"):
+        lines = sql.split("\n")
+        # Remove first line (```sql or ```)
+        lines = lines[1:]
+        # Remove last line if it's ```
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        sql = "\n".join(lines).strip()
+
+    # Remove trailing semicolon (we'll add it back if needed for execution)
+    sql = sql.rstrip(";").strip()
+
+    return sql
+
+
+def _validate_sql(sql: str, table_name: str) -> bool:
+    """
+    Validate that SQL is safe to execute.
+    Returns True if SQL passes validation, False otherwise.
+    """
+    # Normalize: collapse whitespace and lowercase for checking
+    normalized = " ".join(sql.lower().split())
+
+    # Must have SELECT
+    if "select" not in normalized:
+        logger.warning(f"SQL validation failed: no SELECT found")
+        return False
+
+    # Must reference the correct table (handle various whitespace)
+    if f"from {table_name}" not in normalized:
+        logger.warning(f"SQL validation failed: 'from {table_name}' not found in '{normalized[:100]}'")
+        return False
+
+    # Check for dangerous keywords (but NOT semicolons - those are fine at end)
+    dangerous_keywords = [" join ", " insert ", " update ", " delete ", " create ", " drop ", " alter ", " truncate "]
+    for kw in dangerous_keywords:
+        if kw in normalized:
+            logger.warning(f"SQL validation failed: dangerous keyword '{kw.strip()}' found")
+            return False
+
+    # Check for multiple statements (semicolon in middle of query)
+    # Split by semicolon and check if there are multiple non-empty statements
+    statements = [s.strip() for s in sql.split(";") if s.strip()]
+    if len(statements) > 1:
+        logger.warning(f"SQL validation failed: multiple statements detected")
+        return False
+
+    return True
+
+
 def generate_sql(user_query: str, columns: List[str], preview_md: str,
                  table_name: str, spatial: bool = False) -> str:
     """Generate SQL query using LLM"""
@@ -334,7 +389,7 @@ def generate_sql(user_query: str, columns: List[str], preview_md: str,
         "- You MUST NOT use JOINs, subqueries, CTEs, or modify data.\n"
         f"{spatial_hint}"
         "- Prefer aggregates when they answer the question well.\n"
-        "- Return ONLY the SQL query, no explanations."
+        "- Return ONLY the SQL query, no explanations, no markdown."
     ))
 
     user_msg = HumanMessage(content=(
@@ -345,13 +400,13 @@ def generate_sql(user_query: str, columns: List[str], preview_md: str,
     ))
 
     response = llm.invoke([system_msg, user_msg])
-    sql_query = (response.content or "").strip()
+    sql_query = _clean_sql_response(response.content or "")
 
-    # Basic safety check
-    lower_sql = sql_query.lower()
-    bad_keywords = [" join ", " with ", ";", " insert ", " update ", " delete ", " create ", " drop "]
-    if ("select" not in lower_sql or f" from {table_name}" not in lower_sql or
-            any(bad in lower_sql for bad in bad_keywords)):
+    logger.info(f"LLM generated SQL: {sql_query[:200]}...")
+
+    # Validate SQL safety
+    if not _validate_sql(sql_query, table_name):
+        logger.warning(f"SQL validation failed, using fallback query")
         sql_query = f"SELECT * FROM {table_name} LIMIT 500"
 
     return sql_query
