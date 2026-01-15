@@ -107,9 +107,16 @@ def _extract_coordinates(df: pd.DataFrame, max_points: int = 200) -> Optional[Li
     coords = []
     logger.info(f"Extracting coordinates from DataFrame with columns: {list(df.columns)}")
 
-    # Method 1: Check for explicit lat/lon columns
-    lat_cols = [c for c in df.columns if c.lower() in ("lat", "latitude", "y")]
-    lon_cols = [c for c in df.columns if c.lower() in ("lon", "longitude", "x")]
+    # Method 1: Check for explicit lat/lon columns (using substring matching)
+    lat_patterns = ("lat", "latitude")
+    lon_patterns = ("lon", "longitude", "lng")
+
+    lat_cols = [c for c in df.columns if any(p in c.lower() for p in lat_patterns)]
+    lon_cols = [c for c in df.columns if any(p in c.lower() for p in lon_patterns)]
+
+    # Exclude columns that are clearly not coordinates (e.g., "related", "translation")
+    lat_cols = [c for c in lat_cols if not any(excl in c.lower() for excl in ("related", "translation", "plate"))]
+    lon_cols = [c for c in lon_cols if not any(excl in c.lower() for excl in ("related", "translation", "alone", "long_"))]
 
     if lat_cols and lon_cols:
         for _, row in df.head(max_points).iterrows():
