@@ -481,24 +481,95 @@ def analyze_csv(url: str, user_query: str) -> Dict[str, Any]:
 
 def _get_display_columns(df: pd.DataFrame) -> List[str]:
     """
-    Get columns suitable for display, excluding coordinate/geometry columns.
+    Get columns suitable for display, excluding coordinate/geometry columns
+    and other columns that are not useful for the user.
     These columns are still used for map display but hidden from the table.
     """
+    # Column name patterns to exclude (geometry and coordinate-related)
     exclude_patterns = [
         'geometry', 'geom', 'wkb_geometry', 'the_geom', 'shape',
         'lat', 'latitude', 'lon', 'longitude', 'x', 'y',
-        'rechtswert', 'hochwert', 'easting', 'northing'
+        'rechtswert', 'hochwert', 'easting', 'northing',
+        'coord', 'coordinates', 'bbox', 'bounds', 'extent',
+        'wkt', 'gml', 'kml'
     ]
+
+    # Column names that are typically not useful for users (exact matches, case-insensitive)
+    exclude_exact = {
+        'objectid', 'object_id', 'oid', 'fid', 'gid', 'id',
+        'ogc_fid', 'globalid', 'global_id', 'uuid',
+        'shape_leng', 'shape_area', 'shape_length', 'st_area', 'st_length',
+        'created_user', 'created_date', 'last_edited_user', 'last_edited_date',
+        'editor_tracking_enabled', 'objectid_1', 'objectid_2'
+    }
+
+    # WKT geometry type patterns to look for in column values
+    wkt_geometry_patterns = [
+        'POINT', 'LINESTRING', 'POLYGON', 'MULTIPOINT',
+        'MULTILINESTRING', 'MULTIPOLYGON', 'GEOMETRYCOLLECTION'
+    ]
+
     display_cols = []
     for col in df.columns:
         col_lower = col.lower()
-        # Exclude geometry columns and coordinate columns
-        if not any(pattern in col_lower for pattern in exclude_patterns):
-            # Also exclude columns that look like raw coordinate values
-            sample = df[col].head(5).astype(str).tolist()
-            if not any("POINT" in str(s).upper() for s in sample):
-                display_cols.append(col)
+
+        # Skip columns matching exclude patterns (substring match)
+        if any(pattern in col_lower for pattern in exclude_patterns):
+            continue
+
+        # Skip columns matching exact exclude names
+        if col_lower in exclude_exact:
+            continue
+
+        # Skip columns that contain WKT geometry data
+        sample = df[col].head(5).astype(str).tolist()
+        sample_upper = ' '.join(str(s).upper() for s in sample)
+        if any(geom_type in sample_upper for geom_type in wkt_geometry_patterns):
+            continue
+
+        # Skip columns that look like raw numeric coordinate values
+        # (large numbers that could be UTM coordinates or similar)
+        if _column_looks_like_coordinates(df[col]):
+            continue
+
+        display_cols.append(col)
+
     return display_cols
+
+
+def _column_looks_like_coordinates(series: pd.Series) -> bool:
+    """
+    Check if a column appears to contain coordinate values that shouldn't be displayed.
+    Returns True if the column looks like raw coordinate data.
+    """
+    try:
+        # Get sample of non-null values
+        sample = series.dropna().head(10)
+        if len(sample) == 0:
+            return False
+
+        # Try to convert to numeric
+        numeric_sample = pd.to_numeric(sample, errors='coerce').dropna()
+        if len(numeric_sample) < len(sample) * 0.8:
+            # Less than 80% converted to numeric, probably not coordinates
+            return False
+
+        # Check if values look like UTM coordinates (large numbers in typical UTM range)
+        # UTM x values typically 100000-900000, y values typically 0-10000000
+        values = numeric_sample.values
+        if len(values) > 0:
+            min_val = values.min()
+            max_val = values.max()
+            # UTM-like range check (but not too restrictive)
+            if min_val > 10000 and max_val > 100000:
+                # Could be UTM coordinates - check for typical UTM ranges
+                if (100000 <= min_val <= 900000 and 100000 <= max_val <= 900000) or \
+                   (1000000 <= min_val <= 10000000 and 1000000 <= max_val <= 10000000):
+                    return True
+
+        return False
+    except Exception:
+        return False
 
 
 def analyze_geospatial(url: str, user_query: str) -> Dict[str, Any]:
@@ -1048,7 +1119,7 @@ Example: [3, 7, 1, 12, 5, 9, 2, 15, 8, 4]"""
 def select_datasets_for_index(
     user_query: str,
     available_datasets: List[Dict[str, Any]],
-    batch_size: int = 10,
+    batch_size: int = 20,
     max_final_datasets: int = 10
 ) -> List[Dict[str, Any]]:
     """
@@ -1156,7 +1227,7 @@ def design_index(
         selected_datasets = select_datasets_for_index(
             user_query=user_query,
             available_datasets=available_datasets,
-            batch_size=10,
+            batch_size=20,
             max_final_datasets=10
         )
         selection_info = {
