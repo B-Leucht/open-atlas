@@ -6,6 +6,15 @@ import './Chatbot.css';
 // Use the same API as the rest of the app
 const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
 
+// Custom components for ReactMarkdown to wrap tables in scrollable container
+const markdownComponents = {
+  table: ({ children }) => (
+    <div className="table-wrapper">
+      <table>{children}</table>
+    </div>
+  )
+};
+
 // Mock data for testing without API
 const MOCK_INDEX_RESULT = {
   success: true,
@@ -56,6 +65,7 @@ const MOCK_INDEX_RESULT = {
 
 export default function Chatbot({ onIndexResult, onGeoData, isMobileModal = false, onClose = null }) {
   const [open, setOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState([
     { id: 1, text: "Hello! Ask me anything about Munich Open Data. Try asking 'Which district is best for families?' to see an index on the map!", sender: 'bot' }
@@ -198,7 +208,7 @@ export default function Chatbot({ onIndexResult, onGeoData, isMobileModal = fals
               <div className="chat-bubble">
                 {m.sender === 'bot' ? (
                   <div className="markdown-content">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.text}</ReactMarkdown>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{m.text}</ReactMarkdown>
                   </div>
                 ) : (
                   m.text
@@ -242,12 +252,15 @@ export default function Chatbot({ onIndexResult, onGeoData, isMobileModal = fals
   return (
     <div className="chatbot">
       {open && (
-        <div className="chat-window" role="dialog" aria-label="Chatbot window">
+        <div className={`chat-window ${expanded ? 'expanded' : ''}`} role="dialog" aria-label="Chatbot window">
           <div className="chat-header">
             <div className="chat-title">Data Assistant</div>
             <div className="chat-status">
               {apiHealthy === null ? 'Checking...' : apiHealthy ? 'Connected' : 'Offline'}
             </div>
+            <button className="chat-expand" onClick={() => setExpanded(e => !e)} aria-label={expanded ? 'Shrink chat' : 'Expand chat'}>
+              {expanded ? '⊟' : '⊞'}
+            </button>
             <button className="chat-close" onClick={() => setOpen(false)} aria-label="Close chat">×</button>
           </div>
 
@@ -257,7 +270,7 @@ export default function Chatbot({ onIndexResult, onGeoData, isMobileModal = fals
                 <div className="chat-bubble">
                   {m.sender === 'bot' ? (
                     <div className="markdown-content">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.text}</ReactMarkdown>
+                      <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{m.text}</ReactMarkdown>
                     </div>
                   ) : (
                     m.text

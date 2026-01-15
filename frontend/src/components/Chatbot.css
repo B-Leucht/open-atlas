@@ -36,6 +36,11 @@
   display: flex;
   flex-direction: column;
   margin-bottom: 12px;
+  transition: width 0.2s ease;
+}
+
+.chat-window.expanded {
+  width: min(800px, calc(100vw - 40px));
 }
 
 .chat-header {
@@ -59,6 +64,21 @@
   cursor: pointer;
 }
 
+.chat-expand {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 16px;
+  cursor: pointer;
+  opacity: 0.85;
+  padding: 2px 6px;
+  margin-right: 4px;
+}
+
+.chat-expand:hover {
+  opacity: 1;
+}
+
 .chat-messages {
   padding: 12px;
   display: flex;
@@ -78,11 +98,15 @@
 }
 
 .chat-bubble {
-  max-width: 76%;
+  max-width: 85%;
   padding: 8px 10px;
   border-radius: 12px;
   font-size: 0.9rem;
   line-height: 1.2;
+}
+
+.chat-window.expanded .chat-bubble {
+  max-width: 95%;
 }
 
 .chat-message.user .chat-bubble {
@@ -233,10 +257,16 @@
   color: #666;
 }
 
+.markdown-content .table-wrapper {
+  overflow-x: auto;
+  margin: 6px 0;
+  max-width: 100%;
+}
+
 .markdown-content table {
   border-collapse: collapse;
-  margin: 6px 0;
   font-size: 0.85em;
+  white-space: nowrap;
 }
 
 .markdown-content th,
