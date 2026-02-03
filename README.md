@@ -1,5 +1,5 @@
 # Open Atlas - Munich City Data Explorer
-![[Poster.pdf]]
+![[Poster.png]]
 A full-stack web application for exploring Munich's open data with district-level analysis, composite indices, and an AI-powered chatbot.
 
 ## Features
