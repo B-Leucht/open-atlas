@@ -19,7 +19,7 @@ trap cleanup SIGINT SIGTERM
 
 # Check and setup backend dependencies
 echo "Checking backend dependencies..."
-cd backend
+cd backend || return
 
 # Create venv if it doesn't exist
 if [ ! -d "venv" ]; then

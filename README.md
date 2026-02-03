@@ -1,5 +1,5 @@
 # Open Atlas - Munich City Data Explorer
-
+![[Poster.pdf]]
 A full-stack web application for exploring Munich's open data with district-level analysis, composite indices, and an AI-powered chatbot.
 
 ## Features
@@ -55,7 +55,7 @@ open-atlas/
 │   │       └── Tooltip.js     # UI tooltips
 │   └── package.json
 ├── doc/                       # Development scripts & analysis
-│   ├── analysis.py            # Database statistics generator
+│   ├-─ analysis.py            # Database statistics generator
 │   └── chaos_map.py           # Data visualization generator
 ├── start.sh                   # Quick start script
 └── README.md
