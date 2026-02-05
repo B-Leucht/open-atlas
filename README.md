@@ -1,6 +1,6 @@
 # Open Atlas - Munich City Data Explorer
 
-![Poster](poster.png)
+![Poster](doc/poster.png)
 
 A full-stack web application for exploring Munich's open data with district-level analysis, composite indices, and an AI-powered chatbot.
 
@@ -41,18 +41,19 @@ npm install && npm start  # Opens http://localhost:3000
 
 ## API Overview
 
-| Category | Endpoints |
-|----------|-----------|
-| Districts | `GET /api/districts`, `/api/districts/<id>`, `/api/districts/<id>/datasets`, `/api/districts/stats`, `/api/districts/aggregate` |
-| Datasets | `GET /api/v2/datasets`, `/api/v2/datasets/search`, `/api/v2/datasets/<id>`, `/api/v2/datasets/<id>/features`, `/api/v2/stats` |
-| Spatial | `GET /api/v2/features/near`, `/api/v2/features/in-district/<id>` |
-| Indices | `GET /api/indices/presets`, `/api/indices/presets/<id>`, `/api/indices/calculate/<id>`, `POST /api/indices/calculate`, `GET /api/indices/datasets`, `/api/indices/datasets/<id>/columns` |
-| Sync | `GET /api/sync/status`, `POST /api/sync/districts`, `/api/sync/start` |
-| Chat | `POST /api/chat`, `/api/chat/sync-vectors` |
+| Category  | Endpoints                                                                                                                                                                                |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Districts | `GET /api/districts`, `/api/districts/<id>`, `/api/districts/<id>/datasets`, `/api/districts/stats`, `/api/districts/aggregate`                                                          |
+| Datasets  | `GET /api/v2/datasets`, `/api/v2/datasets/search`, `/api/v2/datasets/<id>`, `/api/v2/datasets/<id>/features`, `/api/v2/stats`                                                            |
+| Spatial   | `GET /api/v2/features/near`, `/api/v2/features/in-district/<id>`                                                                                                                         |
+| Indices   | `GET /api/indices/presets`, `/api/indices/presets/<id>`, `/api/indices/calculate/<id>`, `POST /api/indices/calculate`, `GET /api/indices/datasets`, `/api/indices/datasets/<id>/columns` |
+| Sync      | `GET /api/sync/status`, `POST /api/sync/districts`, `/api/sync/start`                                                                                                                    |
+| Chat      | `POST /api/chat`, `/api/chat/sync-vectors`                                                                                                                                               |
 
 ## Composite Indices
 
 Pre-built indices that score each district:
+
 - **Child-Friendly** - Playgrounds, schools, childcare, traffic calming
 - **Senior-Friendly** - Senior centers, doctor/pharmacy density, care facilities
 - **Greenness** - Green spaces, bike lanes, cycling infrastructure
