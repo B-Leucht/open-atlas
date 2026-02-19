@@ -19,23 +19,56 @@ trap cleanup SIGINT SIGTERM
 
 # Check and setup backend dependencies
 echo "Checking backend dependencies..."
-cd backend || return
+cd backend || exit 1
 
-# Create venv if it doesn't exist
-if [ ! -d "venv" ]; then
-    echo "Creating Python virtual environment..."
-    python3 -m venv venv
+# Detect which virtual environment to use
+# Prefer .venv (uv default) if it exists, otherwise use venv
+if [ -d ".venv" ]; then
+    VENV_DIR=".venv"
+elif [ -d "venv" ]; then
+    VENV_DIR="venv"
+else
+    VENV_DIR=""
 fi
 
-source venv/bin/activate
-
-# Install/update Python dependencies (prefer uv, fall back to pip)
+# Check if uv is available
 if command -v uv &> /dev/null; then
+    HAS_UV=1
+else
+    HAS_UV=0
+fi
+
+# Create venv if it doesn't exist
+if [ -z "$VENV_DIR" ]; then
+    if [ $HAS_UV -eq 1 ]; then
+        echo "Creating Python virtual environment with uv..."
+        uv venv
+        VENV_DIR=".venv"
+    else
+        echo "Creating Python virtual environment with venv..."
+        python3 -m venv venv
+        VENV_DIR="venv"
+    fi
+fi
+
+echo "Using virtual environment: $VENV_DIR"
+
+# Activate the virtual environment
+source "$VENV_DIR/bin/activate"
+
+# Install/update Python dependencies
+if [ $HAS_UV -eq 1 ]; then
     echo "Installing Python dependencies with uv..."
-    uv pip install -r requirements.txt --quiet
+    uv pip install -r requirements.txt
 else
     echo "Installing Python dependencies with pip..."
-    pip install -r requirements.txt --quiet
+    pip install -r requirements.txt
+fi
+
+# Source the .env file if it exists (for API keys)
+if [ -f ".env" ]; then
+    echo "Loading environment from .env..."
+    source .env
 fi
 
 cd ..
@@ -60,13 +93,20 @@ cd ..
 echo ""
 
 # Check if backend is running
-if lsof -Pi :5001 -sTCP:LISTEN -t >/dev/null ; then
+if lsof -Pi :5001 -sTCP:LISTEN -t >/dev/null 2>&1 ; then
     echo "✓ Backend is already running on port 5001"
 else
     echo "Starting backend server..."
     cd backend
-    source venv/bin/activate
-    python3 app.py &
+
+    # Activate venv and set environment for development
+    source "$VENV_DIR/bin/activate"
+    if [ -f ".env" ]; then
+        source .env
+    fi
+    export ENV=development
+
+    python3 main.py &
     BACKEND_PID=$!
     cd ..
 
@@ -79,6 +119,12 @@ else
         fi
         sleep 0.5
     done
+
+    # Check if backend failed to start
+    if ! lsof -Pi :5001 -sTCP:LISTEN -t >/dev/null 2>&1; then
+        echo "✗ Backend failed to start. Check the logs above for errors."
+        exit 1
+    fi
 fi
 
 echo ""
