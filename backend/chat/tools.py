@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional
 
 import duckdb
 import pandas as pd
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 
 logger = logging.getLogger(__name__)
@@ -388,7 +388,7 @@ def generate_sql(user_query: str, columns: List[str], preview_md: str,
             "- You may use DuckDB spatial functions like ST_Distance, ST_Within, ST_Point.\n"
         )
 
-    system_msg = AIMessage(content=(
+    system_msg = SystemMessage(content=(
         f"You are a data analyst writing DuckDB SQL over a table named `{table_name}`.\n"
         "- Use ONLY the available columns.\n"
         "- Your query MUST be a single SELECT statement.\n"
@@ -469,16 +469,25 @@ def analyze_csv(url: str, user_query: str) -> Dict[str, Any]:
             display_cols = list(result_df.columns)
             display_df = result_df
 
+        preview_md = display_df.head(200).to_markdown(index=False)
         result = {
             "kind": "csv",
             "sql_query": sql_query,
-            "preview_markdown": display_df.head(200).to_markdown(index=False),
+            "preview_markdown": preview_md,
             "columns": display_cols,
             "row_count": len(result_df),
         }
 
         if coords:
             result["coordinates"] = coords
+
+        # Human-readable summary for the agentic tool path
+        result["content"] = (
+            f"SQL: {sql_query}\n"
+            f"Rows: {len(result_df)} | Columns: {', '.join(display_cols)}\n\n"
+            f"{preview_md[:3000]}"
+            + (f"\n\n{len(coords)} geographic locations found." if coords else "")
+        )
 
         return result
 
@@ -619,16 +628,25 @@ def analyze_geospatial(url: str, user_query: str) -> Dict[str, Any]:
         display_cols = _get_display_columns(result_df)
         display_df = result_df[display_cols] if display_cols else result_df
 
+        preview_md = display_df.head(200).to_markdown(index=False)
         result = {
             "kind": "geospatial",
             "sql_query": sql_query,
-            "preview_markdown": display_df.head(200).to_markdown(index=False),
+            "preview_markdown": preview_md,
             "columns": display_cols,
             "row_count": len(result_df),
         }
 
         if coords:
             result["coordinates"] = coords
+
+        # Human-readable summary for the agentic tool path
+        result["content"] = (
+            f"SQL: {sql_query}\n"
+            f"Rows: {len(result_df)} | Columns: {', '.join(display_cols)}\n\n"
+            f"{preview_md[:3000]}"
+            + (f"\n\n{len(coords)} geographic locations found." if coords else "")
+        )
 
         return result
 
@@ -751,7 +769,7 @@ def classify_query(user_query: str) -> Dict[str, Any]:
     """
     llm = ChatOpenAI(model="gpt-5-mini", temperature=0.0)
 
-    system_msg = AIMessage(content="""You classify user queries about Munich open data into exactly ONE category.
+    system_msg = SystemMessage(content="""You classify user queries about Munich open data into exactly ONE category.
 
 Categories:
 1. SINGLE_DATASET - Simple factual queries about one topic
@@ -908,7 +926,7 @@ def _synthesize_multi_results(results: List[Dict[str, Any]], user_query: str) ->
         results_text += f"Rows: {result.get('row_count', 0)}\n"
         results_text += f"Preview:\n{result.get('preview_markdown', 'No data')}\n"
 
-    system_msg = AIMessage(content="""You are a data analyst synthesizing insights from multiple Munich datasets.
+    system_msg = SystemMessage(content="""You are a data analyst synthesizing insights from multiple Munich datasets.
 
 Instructions:
 - Compare and contrast the datasets
@@ -999,23 +1017,21 @@ def _select_relevant_from_batch(
         for d in batch
     ])
 
-    prompt = f"""You are selecting datasets for creating a district ranking index.
+    prompt = f"""You are strictly filtering datasets for a district ranking index.
 
 User Query: "{user_query}"
 
-Review each dataset below and determine if it could be relevant for answering this query.
-Include datasets that are DIRECTLY relevant (e.g., playgrounds for family-friendliness)
-AND datasets that are INDIRECTLY relevant (e.g., traffic calming for safety).
-
-When in doubt, INCLUDE the dataset - it's better to have more options than to miss something useful.
+Include a dataset ONLY if it directly measures something the query is explicitly about.
+Exclude datasets about unrelated topics, administrative metadata, or city-wide aggregates with no district breakdown.
+Be selective — a good index uses 3–8 focused datasets, not everything remotely connected.
 
 Datasets to review:
 {batch_text}
 
-Return a JSON array containing ONLY the IDs of relevant datasets.
-Example: ["dataset-id-1", "dataset-id-5", "dataset-id-8"]
+Return a JSON array containing ONLY the IDs of datasets that clearly belong in this index.
+Example: ["dataset-id-1", "dataset-id-5"]
 
-If none are relevant, return an empty array: []"""
+If none clearly belong, return an empty array: []"""
 
     try:
         response = llm.invoke(prompt)
@@ -1039,8 +1055,9 @@ If none are relevant, return an empty array: []"""
 
     except Exception as e:
         logger.error(f"Batch {batch_index} selection failed: {e}")
-        # On error, return all IDs from batch to avoid losing potentially relevant datasets
-        return [d['id'] for d in batch]
+        print(f"[DEBUG] Batch {batch_index} failed ({len(batch)} datasets): {type(e).__name__}: {e}")
+        print(f"[DEBUG] Batch {batch_index} dataset titles: {[d['title'] for d in batch]}")
+        return []
 
 
 def _select_best_datasets(
@@ -1126,7 +1143,7 @@ Example: [3, 7, 1, 12, 5, 9, 2, 15, 8, 4]"""
 def select_datasets_for_index(
     user_query: str,
     available_datasets: List[Dict[str, Any]],
-    batch_size: int = 20,
+    batch_size: int = 25,
     max_final_datasets: int = 10
 ) -> List[Dict[str, Any]]:
     """
@@ -1176,8 +1193,6 @@ def select_datasets_for_index(
                 all_relevant_ids.update(selected_ids)
             except Exception as e:
                 logger.error(f"Batch {batch_idx} raised exception: {e}")
-                # On error, include all datasets from that batch
-                all_relevant_ids.update(d['id'] for d in batches[batch_idx])
 
     # Get full dataset objects for relevant IDs
     relevant_datasets = [d for d in useful_datasets if d['id'] in all_relevant_ids]
@@ -1261,7 +1276,7 @@ def design_index(
         for d in selected_datasets
     ])
 
-    system_msg = AIMessage(content="""You design composite indices for ranking Munich districts.
+    system_msg = SystemMessage(content="""You design composite indices for ranking Munich districts.
 
 TASK: Create an index that answers the user's question by combining 3-10 relevant datasets.
 

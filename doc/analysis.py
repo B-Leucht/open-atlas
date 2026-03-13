@@ -17,6 +17,7 @@ import numpy as np
 DB_PATH = Path(__file__).parent.parent / "backend" / "data" / "openatlas.db"
 
 COLORS = [
+    '#0097b2', '#8274d9', '#dad58d', '#e2b6b2', '#f6e0be',
     '#00d4ff', '#ff006e', '#ffbe0b', '#8338ec', '#3a86ff', '#00f5d4',
     '#fb5607', '#ff0054', '#9b5de5', '#00ff87', '#f15bb5', '#fee440'
 ]
@@ -157,11 +158,11 @@ def generate_visualization(db_path: str = None, output_path: str = "munich_data_
     cursor = conn.cursor()
 
     fig = plt.figure(figsize=(20, 16))
-    fig.patch.set_facecolor('#0a0a12')
+    fig.patch.set_facecolor('#f9e2dd')
 
     # 1. Data Attribution Pie
     ax1 = fig.add_subplot(2, 3, 1)
-    ax1.set_facecolor('#12121a')
+    ax1.set_facecolor('#f9e2dd')
 
     cursor.execute("""
         SELECT
@@ -175,12 +176,12 @@ def generate_visualization(db_path: str = None, output_path: str = "munich_data_
     sizes = [geo_district, district_only, city_wide]
     labels = [f'Geo + District\n{geo_district:,}', f'District Only\n{district_only:,}', f'City-wide\n{city_wide:,}']
     ax1.pie(sizes, labels=labels, autopct='%1.1f%%', colors=COLORS[:3],
-            explode=(0.02, 0.02, 0.05), textprops={'color': 'white', 'fontsize': 10})
-    ax1.set_title('Data Attribution', color='#00d4ff', fontsize=14, fontweight='bold')
+            explode=(0.02, 0.02, 0.05), textprops={'color': '#333', 'fontsize': 10})
+    ax1.set_title('Data Attribution', color='#0097b2', fontsize=14, fontweight='bold')
 
     # 2. Geometry Types
     ax2 = fig.add_subplot(2, 3, 2)
-    ax2.set_facecolor('#12121a')
+    ax2.set_facecolor('#f9e2dd')
 
     cursor.execute("""
         SELECT geometry_type, COUNT(*) FROM features
@@ -193,21 +194,21 @@ def generate_visualization(db_path: str = None, output_path: str = "munich_data_
         y_pos = np.arange(len(types))
         bars = ax2.barh(y_pos, counts, color=COLORS[:len(types)])
         ax2.set_yticks(y_pos)
-        ax2.set_yticklabels(types, color='white')
-        ax2.set_xlabel('Count', color='white')
-        ax2.tick_params(colors='white')
+        ax2.set_yticklabels(types, color='#333')
+        ax2.set_xlabel('Count', color='#333')
+        ax2.tick_params(colors='#333')
         for bar, count in zip(bars, counts):
             ax2.text(bar.get_width() + 500, bar.get_y() + bar.get_height()/2,
-                    f'{count:,}', va='center', color='white', fontsize=9)
-    ax2.set_title('Geometry Types', color='#00d4ff', fontsize=14, fontweight='bold')
+                    f'{count:,}', va='center', color='#333', fontsize=9)
+    ax2.set_title('Geometry Types', color='#0097b2', fontsize=14, fontweight='bold')
     for spine in ['top', 'right']:
         ax2.spines[spine].set_visible(False)
     for spine in ['bottom', 'left']:
-        ax2.spines[spine].set_color('#333')
+        ax2.spines[spine].set_color('#999')
 
     # 3. Licenses
     ax3 = fig.add_subplot(2, 3, 3)
-    ax3.set_facecolor('#12121a')
+    ax3.set_facecolor('#f9e2dd')
 
     cursor.execute("""
         SELECT license, COUNT(*) FROM datasets
@@ -221,21 +222,21 @@ def generate_visualization(db_path: str = None, output_path: str = "munich_data_
         y_pos = np.arange(len(short_names))
         bars = ax3.barh(y_pos, counts, color=COLORS[3:3+len(short_names)])
         ax3.set_yticks(y_pos)
-        ax3.set_yticklabels(short_names, color='white', fontsize=9)
-        ax3.set_xlabel('Datasets', color='white')
-        ax3.tick_params(colors='white')
+        ax3.set_yticklabels(short_names, color='#333', fontsize=9)
+        ax3.set_xlabel('Datasets', color='#333')
+        ax3.tick_params(colors='#333')
         for bar, count in zip(bars, counts):
             ax3.text(bar.get_width() + 1, bar.get_y() + bar.get_height()/2,
-                    str(count), va='center', color='white', fontsize=9)
-    ax3.set_title('Licenses', color='#00d4ff', fontsize=14, fontweight='bold')
+                    str(count), va='center', color='#333', fontsize=9)
+    ax3.set_title('Licenses', color='#0097b2', fontsize=14, fontweight='bold')
     for spine in ['top', 'right']:
         ax3.spines[spine].set_visible(False)
     for spine in ['bottom', 'left']:
-        ax3.spines[spine].set_color('#333')
+        ax3.spines[spine].set_color('#999')
 
     # 4. Organizations
     ax4 = fig.add_subplot(2, 3, 4)
-    ax4.set_facecolor('#12121a')
+    ax4.set_facecolor('#f9e2dd')
 
     cursor.execute("""
         SELECT organization, COUNT(*) FROM datasets
@@ -249,21 +250,21 @@ def generate_visualization(db_path: str = None, output_path: str = "munich_data_
         y_pos = np.arange(len(short_names))
         bars = ax4.barh(y_pos, counts, color=COLORS[:len(short_names)])
         ax4.set_yticks(y_pos)
-        ax4.set_yticklabels(short_names, color='white', fontsize=9)
-        ax4.set_xlabel('Datasets', color='white')
-        ax4.tick_params(colors='white')
+        ax4.set_yticklabels(short_names, color='#333', fontsize=9)
+        ax4.set_xlabel('Datasets', color='#333')
+        ax4.tick_params(colors='#333')
         for bar, count in zip(bars, counts):
             ax4.text(bar.get_width() + 1, bar.get_y() + bar.get_height()/2,
-                    str(count), va='center', color='white', fontsize=9)
-    ax4.set_title('Data Publishers', color='#00d4ff', fontsize=14, fontweight='bold')
+                    str(count), va='center', color='#333', fontsize=9)
+    ax4.set_title('Data Publishers', color='#0097b2', fontsize=14, fontweight='bold')
     for spine in ['top', 'right']:
         ax4.spines[spine].set_visible(False)
     for spine in ['bottom', 'left']:
-        ax4.spines[spine].set_color('#333')
+        ax4.spines[spine].set_color('#999')
 
     # 5. Themes
     ax5 = fig.add_subplot(2, 3, 5)
-    ax5.set_facecolor('#12121a')
+    ax5.set_facecolor('#f9e2dd')
 
     cursor.execute("SELECT groups FROM datasets WHERE groups IS NOT NULL")
     all_groups = Counter()
@@ -280,21 +281,21 @@ def generate_visualization(db_path: str = None, output_path: str = "munich_data_
         y_pos = np.arange(len(names))
         bars = ax5.barh(y_pos, counts, color=COLORS[2:2+len(names)])
         ax5.set_yticks(y_pos)
-        ax5.set_yticklabels([n[:35] for n in names], color='white', fontsize=9)
-        ax5.set_xlabel('Datasets', color='white')
-        ax5.tick_params(colors='white')
+        ax5.set_yticklabels([n[:35] for n in names], color='#333', fontsize=9)
+        ax5.set_xlabel('Datasets', color='#333')
+        ax5.tick_params(colors='#333')
         for bar, count in zip(bars, counts):
             ax5.text(bar.get_width() + 0.5, bar.get_y() + bar.get_height()/2,
-                    str(count), va='center', color='white', fontsize=9)
-    ax5.set_title('Themes / Categories', color='#00d4ff', fontsize=14, fontweight='bold')
+                    str(count), va='center', color='#333', fontsize=9)
+    ax5.set_title('Themes / Categories', color='#0097b2', fontsize=14, fontweight='bold')
     for spine in ['top', 'right']:
         ax5.spines[spine].set_visible(False)
     for spine in ['bottom', 'left']:
-        ax5.spines[spine].set_color('#333')
+        ax5.spines[spine].set_color('#999')
 
     # 6. Summary Stats
     ax6 = fig.add_subplot(2, 3, 6)
-    ax6.set_facecolor('#12121a')
+    ax6.set_facecolor('#f9e2dd')
     ax6.axis('off')
 
     cursor.execute("SELECT COUNT(*) FROM datasets")
@@ -331,12 +332,12 @@ Index-Ready:       ~88%
 """
 
     ax6.text(0.1, 0.9, stats_text, transform=ax6.transAxes, fontsize=12,
-             verticalalignment='top', color='white', fontfamily='monospace',
-             bbox=dict(boxstyle='round', facecolor='#1a1a2e', edgecolor='#00d4ff', alpha=0.8))
-    ax6.set_title('Summary Statistics', color='#00d4ff', fontsize=14, fontweight='bold')
+             verticalalignment='top', color='#333', fontfamily='monospace',
+             bbox=dict(boxstyle='round', facecolor='#fff', edgecolor='#0097b2', alpha=0.8))
+    ax6.set_title('Summary Statistics', color='#0097b2', fontsize=14, fontweight='bold')
 
     fig.suptitle('MUNICH OPEN DATA - DATABASE OVERVIEW',
-                 color='#00d4ff', fontsize=20, fontweight='bold', y=0.98)
+                 color='#0097b2', fontsize=20, fontweight='bold', y=0.98)
 
     plt.tight_layout(rect=[0, 0, 1, 0.95])
     plt.savefig(output_path, dpi=150, facecolor=fig.get_facecolor(),
