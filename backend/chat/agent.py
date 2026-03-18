@@ -330,6 +330,93 @@ class ChatAgent:
 
         return response
 
+    def stream_query(self, user_query: str, thread_id: Optional[str] = None):
+        """
+        Stream agent progress as SSE events.
+
+        Yields SSE-formatted strings:
+          data: {"type": "tool_start", "name": "...", "label": "..."}\n\n
+          data: {"type": "done", "answer": "...", "thread_id": "...", ...}\n\n
+          data: {"type": "error", "message": "..."}\n\n
+        """
+        if not USE_AGENTIC_GRAPH:
+            # Legacy path: no streaming support, fall back to single call
+            result = self.query(user_query, thread_id=thread_id)
+            yield f"data: {json.dumps({'type': 'done', **result})}\n\n"
+            return
+
+        if not thread_id:
+            thread_id = str(uuid.uuid4())
+
+        base_state: AgentState = {
+            "messages": [HumanMessage(content=user_query)],
+            "districts_context": self.get_districts_context(),
+            "geo_data": None,
+            "index_result": None,
+            "suggested_index": None,
+        }
+
+        config = {
+            "configurable": {"thread_id": thread_id},
+            "recursion_limit": 12,
+        }
+        _memory_store.touch(thread_id)
+
+        TOOL_LABELS = {
+            "search_datasets": "🔍 Searching datasets...",
+            "analyze_dataset": "📊 Analyzing data...",
+            "find_nearby": "📍 Finding nearby locations...",
+            "get_district_summary": "🏘️ Loading district info...",
+            "list_preset_indices": "📋 Checking preset indices...",
+            "use_preset_index": "🏆 Calculating preset index...",
+            "calculate_district_index": "🧮 Computing district scores...",
+            "get_dataset_columns": "🔎 Inspecting dataset...",
+        }
+
+        geo_data = None
+        index_result = None
+        suggested_index = None
+        answer = "I could not generate an answer."
+
+        try:
+            for chunk in self.graph.stream(base_state, config, stream_mode="updates"):
+                for node_name, node_output in chunk.items():
+                    if node_name == "agent":
+                        for msg in node_output.get("messages", []):
+                            if isinstance(msg, AIMessage):
+                                if getattr(msg, "tool_calls", None):
+                                    for tc in msg.tool_calls:
+                                        label = TOOL_LABELS.get(tc["name"], f"⚙️ Running {tc['name']}...")
+                                        yield f"data: {json.dumps({'type': 'tool_start', 'name': tc['name'], 'label': label})}\n\n"
+                                else:
+                                    answer = msg.content
+
+                    elif node_name == "tools":
+                        if node_output.get("geo_data"):
+                            geo_data = node_output["geo_data"]
+                        if node_output.get("index_result"):
+                            index_result = node_output["index_result"]
+                            suggested_index = node_output.get("suggested_index")
+
+        except Exception as e:
+            logger.error(f"stream_query error: {e}")
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+            return
+
+        done: Dict[str, Any] = {
+            "type": "done",
+            "answer": answer,
+            "query_type": "agentic",
+            "thread_id": thread_id,
+        }
+        if index_result and index_result.get("success"):
+            done["index_result"] = index_result
+            done["suggested_index"] = suggested_index
+        if geo_data:
+            done["geo_data"] = geo_data
+
+        yield f"data: {json.dumps(done)}\n\n"
+
     def query_text(self, user_query: str) -> str:
         """Return just the answer text. For backward compatibility."""
         return self.query(user_query).get("answer", "I could not generate an answer.")
