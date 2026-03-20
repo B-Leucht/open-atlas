@@ -267,7 +267,7 @@ function App() {
 
       try {
         const response = await axios.get(`${API_URL}/v2/datasets/${comp.dataset_id}/features`, {
-          params: { limit: 500 }
+          params: { limit: 1000 }
         });
 
         if (response.data.success && response.data.data?.features) {
@@ -418,7 +418,7 @@ function App() {
 
       try {
         const response = await axios.get(`${API_URL}/v2/datasets/${geoData.dataset_id}/features`, {
-          params: { limit: 500 }
+          params: { limit: 1000 }
         });
 
         if (response.data.success && response.data.data?.features) {

@@ -93,7 +93,7 @@ class DuckDBConnectionManager:
 _duckdb_manager = DuckDBConnectionManager()
 
 
-def _extract_coordinates(df: pd.DataFrame, max_points: int = 200) -> Optional[List[Dict[str, float]]]:
+def _extract_coordinates(df: pd.DataFrame, max_points: int = 1000) -> Optional[List[Dict[str, float]]]:
     """
     Extract coordinates from a DataFrame.
 
@@ -128,6 +128,30 @@ def _extract_coordinates(df: pd.DataFrame, max_points: int = 200) -> Optional[Li
             except (ValueError, TypeError):
                 continue
         if coords:
+            return coords
+
+    # Method 1b: Check for x/y columns (common when SQL extracts from POINT strings)
+    # Handles both UTM (EPSG:25832) and WGS84 ranges
+    x_cols = [c for c in df.columns if c.lower() in ('x', 'x_coord', 'xcoord', 'x_coordinate', 'easting')]
+    y_cols = [c for c in df.columns if c.lower() in ('y', 'y_coord', 'ycoord', 'y_coordinate', 'northing')]
+    if x_cols and y_cols:
+        logger.info(f"Found x/y columns, attempting coordinate extraction")
+        for _, row in df.head(max_points).iterrows():
+            try:
+                x_val = float(row[x_cols[0]])
+                y_val = float(row[y_cols[0]])
+                if x_val > 100000 and y_val > 1000000:
+                    # UTM range (EPSG:25832) — convert to WGS84
+                    lon, lat = _convert_utm_to_wgs84(x_val, y_val)
+                    if lon is not None and lat is not None:
+                        coords.append({"lat": lat, "lon": lon})
+                elif -180 <= x_val <= 180 and -90 <= y_val <= 90:
+                    # Already WGS84 (x=lon, y=lat in WKT convention)
+                    coords.append({"lat": y_val, "lon": x_val})
+            except (ValueError, TypeError):
+                continue
+        if coords:
+            logger.info(f"Extracted {len(coords)} coordinates from x/y columns")
             return coords
 
     # Method 2: Check for geometry columns with WKT POINT format
@@ -388,13 +412,27 @@ def generate_sql(user_query: str, columns: List[str], preview_md: str,
             "- You may use DuckDB spatial functions like ST_Distance, ST_Within, ST_Point.\n"
         )
 
+    # Detect geometry columns and build a coordinate extraction hint
+    geom_col_names = ("geometry", "geom", "wkb_geometry", "the_geom", "shape")
+    geom_cols = [c for c in columns if c.lower() in geom_col_names]
+    coord_hint = ""
+    if geom_cols:
+        col = geom_cols[0]
+        coord_hint = (
+            f"- The column `{col}` contains WKT POINT geometry. ALWAYS extract x/y from it using:\n"
+            f"  CAST(split_part(trim(replace(replace({col}, 'POINT (', ''), ')', '')), ' ', 1) AS DOUBLE) AS x,\n"
+            f"  CAST(split_part(trim(replace(replace({col}, 'POINT (', ''), ')', '')), ' ', 2) AS DOUBLE) AS y\n"
+            f"  Include these x and y columns in EVERY query that returns individual rows.\n"
+        )
+
     system_msg = SystemMessage(content=(
         f"You are a data analyst writing DuckDB SQL over a table named `{table_name}`.\n"
         "- Use ONLY the available columns.\n"
         "- Your query MUST be a single SELECT statement.\n"
-        "- You MAY use WHERE, GROUP BY, ORDER BY, and LIMIT clauses.\n"
+        "- You MAY use WHERE, GROUP BY, ORDER BY, and LIMIT clauses. Use LIMIT 1000 when returning individual rows (not aggregates).\n"
         "- You MUST NOT use JOINs, subqueries, CTEs, or modify data.\n"
         f"{spatial_hint}"
+        f"{coord_hint}"
         "- Prefer aggregates when they answer the question well.\n"
         "- Return ONLY the SQL query, no explanations, no markdown."
     ))
@@ -440,7 +478,7 @@ def analyze_csv(url: str, user_query: str) -> Dict[str, Any]:
         conn.register("tab", df)
 
         # Get preview
-        preview_df = conn.execute("SELECT * FROM tab LIMIT 200").fetch_df()
+        preview_df = conn.execute("SELECT * FROM tab LIMIT 1000").fetch_df()
         columns = list(preview_df.columns)
         preview_md = preview_df.head(20).to_markdown(index=False)
 
@@ -454,7 +492,7 @@ def analyze_csv(url: str, user_query: str) -> Dict[str, Any]:
             logger.debug(f"SQL failed, using fallback: {e}")
             # Fallback to simple preview
             result_df = preview_df
-            sql_query = "SELECT * FROM tab LIMIT 200"
+            sql_query = "SELECT * FROM tab LIMIT 1000"
 
         # Extract coordinates if present (CSV might have lat/lon columns)
         logger.info(f"CSV analysis: extracting coordinates from result with columns {list(result_df.columns)}")
@@ -601,7 +639,7 @@ def analyze_geospatial(url: str, user_query: str) -> Dict[str, Any]:
         conn.execute("CREATE OR REPLACE VIEW geo AS SELECT * FROM ST_Read(?);", [url])
 
         # Get preview
-        preview_df = conn.execute("SELECT * FROM geo LIMIT 200").fetch_df()
+        preview_df = conn.execute("SELECT * FROM geo LIMIT 1000").fetch_df()
         columns = list(preview_df.columns)
         logger.info(f"Loaded geospatial data with columns: {columns}")
         preview_md = preview_df.head(20).to_markdown(index=False)
@@ -617,7 +655,7 @@ def analyze_geospatial(url: str, user_query: str) -> Dict[str, Any]:
         except Exception as e:
             logger.debug(f"Spatial SQL failed, using fallback: {e}")
             result_df = preview_df
-            sql_query = "SELECT * FROM geo LIMIT 200"
+            sql_query = "SELECT * FROM geo LIMIT 1000"
 
         # Extract coordinates if present (before filtering columns)
         logger.info(f"Calling _extract_coordinates with DataFrame of shape {result_df.shape}")

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import chatbotIcon from './chatbot-icon.jpg';
 import './Chatbot.css';
 
 // Use the same API as the rest of the app
@@ -98,7 +99,7 @@ export default function Chatbot({ onIndexResult, onGeoData, isMobileModal = fals
   };
 
   const send = async () => {
-    if (!input.trim()) return;
+    if (!input.trim() || sending) return;
 
     const userMessageText = input;
     const newUserMsg = { id: Date.now(), text: userMessageText, sender: 'user' };
@@ -256,8 +257,13 @@ export default function Chatbot({ onIndexResult, onGeoData, isMobileModal = fals
     }
   };
 
+  const statusLabel = apiHealthy === null ? 'Checking...' : apiHealthy ? 'Connected' : 'Offline';
   const statusDot = (
-    <span className={`status-dot ${apiHealthy === null ? 'checking' : apiHealthy ? 'online' : 'offline'}`} />
+    <span
+      className={`status-dot ${apiHealthy === null ? 'checking' : apiHealthy ? 'online' : 'offline'}`}
+      aria-label={statusLabel}
+      title={statusLabel}
+    />
   );
 
   const progressDisplay = sending && (
@@ -288,8 +294,11 @@ export default function Chatbot({ onIndexResult, onGeoData, isMobileModal = fals
           <button className="chat-back-button" onClick={onClose} aria-label="Close chat">
             ←
           </button>
-          <div className="chat-title">🤖 Data Assistant</div>
-          <div className="chat-status">{statusDot}</div>
+          <div className="chat-title">Data Assistant</div>
+          <div className="chat-status">
+            {statusDot}
+            <span className="status-label">{statusLabel}</span>
+          </div>
         </div>
 
         <div className="chat-messages" ref={messagesRef}>
@@ -321,8 +330,9 @@ export default function Chatbot({ onIndexResult, onGeoData, isMobileModal = fals
             onKeyDown={handleKeyDown}
             placeholder="Ask about Munich data..."
             rows={1}
+            disabled={sending}
           />
-          <button className="chat-send" onClick={send} disabled={sending || !input.trim()}>
+          <button className="chat-send" onClick={send} disabled={sending || !input.trim()} aria-label="Send message">
             →
           </button>
         </div>
@@ -336,8 +346,11 @@ export default function Chatbot({ onIndexResult, onGeoData, isMobileModal = fals
       {open && (
         <div className={`chat-window ${expanded ? 'expanded' : ''}`} role="dialog" aria-label="Chatbot window">
           <div className="chat-header">
-            <div className="chat-title">🤖 Data Assistant</div>
-            <div className="chat-status">{statusDot}</div>
+            <div className="chat-title">Data Assistant</div>
+            <div className="chat-status">
+              {statusDot}
+              <span className="status-label">{statusLabel}</span>
+            </div>
             <button className="chat-expand" onClick={() => setExpanded(e => !e)} aria-label={expanded ? 'Shrink chat' : 'Expand chat'}>
               {expanded ? '⊟' : '⊞'}
             </button>
@@ -374,7 +387,7 @@ export default function Chatbot({ onIndexResult, onGeoData, isMobileModal = fals
               placeholder="Ask about Munich data..."
               rows={1}
             />
-            <button className="chat-send" onClick={send} disabled={sending || !input.trim()}>
+            <button className="chat-send" onClick={send} disabled={sending || !input.trim()} aria-label="Send message">
               →
             </button>
             <button className="chat-test" onClick={testIndexDisplay} title="Test index display">
@@ -392,7 +405,7 @@ export default function Chatbot({ onIndexResult, onGeoData, isMobileModal = fals
         }}
         aria-label="Open chat"
       >
-        💬
+        <img src={chatbotIcon} alt="" className="chat-toggle-icon" />
       </button>
     </div>
   );

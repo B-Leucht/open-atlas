@@ -17,6 +17,7 @@ from typing import Annotated, Any, Dict, List, Optional, TypedDict
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
+from langgraph.errors import GraphRecursionError
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.checkpoint.memory import MemorySaver
@@ -282,7 +283,19 @@ class ChatAgent:
         }
         _memory_store.touch(thread_id)
 
-        final_state = self.graph.invoke(base_state, config)
+        try:
+            final_state = self.graph.invoke(base_state, config)
+        except GraphRecursionError:
+            logger.warning("Agent hit recursion limit for query: %s", user_query[:120])
+            return {
+                "answer": (
+                    "I wasn't able to fully answer your question — the analysis required "
+                    "too many steps and hit an internal limit. Try rephrasing your question "
+                    "or breaking it into smaller parts."
+                ),
+                "query_type": "agentic" if USE_AGENTIC_GRAPH else "single_dataset",
+                "thread_id": thread_id,
+            }
 
         # Extract the final assistant message (skip intermediate tool-calling turns)
         answer = "I could not generate an answer."
@@ -398,6 +411,20 @@ class ChatAgent:
                             index_result = node_output["index_result"]
                             suggested_index = node_output.get("suggested_index")
 
+        except GraphRecursionError:
+            logger.warning("Agent hit recursion limit for query: %s", user_query[:120])
+            recursion_msg = (
+                "I wasn't able to fully answer your question — the analysis required "
+                "too many steps and hit an internal limit. Try rephrasing your question "
+                "or breaking it into smaller parts."
+            )
+            yield "data: " + json.dumps({
+                "type": "done",
+                "answer": recursion_msg,
+                "query_type": "agentic",
+                "thread_id": thread_id,
+            }) + "\n\n"
+            return
         except Exception as e:
             logger.error(f"stream_query error: {e}")
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
