@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request
+from flask import Flask, Response, jsonify, request
 from flask_cors import CORS
 import threading
 import logging
@@ -852,6 +852,45 @@ def chat():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+@app.route("/api/chat/stream", methods=["POST"])
+def chat_stream():
+    """
+    Send a query to the AI agent and stream progress events as Server-Sent Events.
+
+    Request body:
+    - query: The user's question (required)
+    - thread_id: Conversation thread ID (optional)
+
+    Returns text/event-stream with SSE events:
+    - {"type": "tool_start", "name": "...", "label": "..."}
+    - {"type": "done", "answer": "...", "thread_id": "...", ...}
+    - {"type": "error", "message": "..."}
+    """
+    try:
+        data = request.get_json()
+        if not data or not data.get("query"):
+            return jsonify({"success": False, "error": "Query is required"}), 400
+
+        query = data["query"].strip()
+        if not query:
+            return jsonify({"success": False, "error": "Query cannot be empty"}), 400
+
+        thread_id = data.get("thread_id")
+        agent = get_chat_agent()
+
+        def generate():
+            for event in agent.stream_query(query, thread_id=thread_id):
+                yield event
+
+        response = Response(generate(), mimetype="text/event-stream")
+        response.headers["Cache-Control"] = "no-cache"
+        response.headers["X-Accel-Buffering"] = "no"
+        return response
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @app.route("/api/chat/sync-vectors", methods=["POST"])
 def sync_vector_store():
     """Sync vector store from local database"""
@@ -973,6 +1012,7 @@ def index():
                 },
                 "Chat (AI Agent)": {
                     "POST /api/chat": "Send query to AI agent (body: {query: string})",
+                    "POST /api/chat/stream": "Stream agent progress as SSE (body: {query: string})",
                     "POST /api/chat/sync-vectors": "Sync vector store from database",
                 },
                 "Data Sources": {"GET /api/sources": "List configured data sources"},

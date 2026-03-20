@@ -73,6 +73,7 @@ export default function Chatbot({ onIndexResult, onGeoData, isMobileModal = fals
   const [sending, setSending] = useState(false);
   const [apiHealthy, setApiHealthy] = useState(null);
   const [threadId, setThreadId] = useState(null);
+  const [progressSteps, setProgressSteps] = useState([]);
 
   const messagesRef = useRef(null);
 
@@ -80,7 +81,7 @@ export default function Chatbot({ onIndexResult, onGeoData, isMobileModal = fals
     if (messagesRef.current) {
       messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [messages, progressSteps]);
 
   useEffect(() => {
     checkHealth();
@@ -89,11 +90,7 @@ export default function Chatbot({ onIndexResult, onGeoData, isMobileModal = fals
   const checkHealth = async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/health`);
-      if (response.ok) {
-        setApiHealthy(true);
-      } else {
-        setApiHealthy(false);
-      }
+      setApiHealthy(response.ok);
     } catch (error) {
       console.warn("Health check failed:", error);
       setApiHealthy(false);
@@ -108,61 +105,132 @@ export default function Chatbot({ onIndexResult, onGeoData, isMobileModal = fals
     setMessages(prev => [...prev, newUserMsg]);
     setInput('');
     setSending(true);
+    setProgressSteps([]);
+
+    let streamingSucceeded = false;
 
     try {
-      const response = await fetch(`${API_BASE_URL}/chat`, {
+      const response = await fetch(`${API_BASE_URL}/chat/stream`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          query: userMessageText,
-          thread_id: threadId
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: userMessageText, thread_id: threadId }),
       });
 
-      const data = await response.json();
-
-      if (data.success) {
-        // Store thread_id for conversation continuity
-        if (data.thread_id) {
-          setThreadId(data.thread_id);
-        }
-
-        // Build message with optional visualization indicator
-        let messageText = data.answer;
-        let hasVisualization = false;
-
-        // Handle index result - display on map
-        if (data.index_result && onIndexResult) {
-          onIndexResult(data.index_result, data.suggested_index);
-          hasVisualization = true;
-        }
-
-        // Handle geographic data - display points on map
-        if (data.geo_data && onGeoData) {
-          onGeoData(data.geo_data);
-          hasVisualization = true;
-        }
-
-        const newBotMsg = {
-          id: Date.now() + 1,
-          text: messageText,
-          sender: 'bot',
-          hasVisualization,
-          queryType: data.query_type
-        };
-        setMessages(prev => [...prev, newBotMsg]);
-      } else {
-        const errorMsg = { id: Date.now() + 1, text: data.error || "Something went wrong.", sender: 'bot' };
-        setMessages(prev => [...prev, errorMsg]);
+      if (!response.ok || !response.body) {
+        throw new Error('Streaming not available');
       }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop(); // keep incomplete last line
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          try {
+            const event = JSON.parse(line.slice(6));
+
+            if (event.type === 'tool_start') {
+              setProgressSteps(prev => [...prev, event.label]);
+            } else if (event.type === 'done') {
+              streamingSucceeded = true;
+              setProgressSteps([]);
+
+              if (event.thread_id) setThreadId(event.thread_id);
+
+              let hasVisualization = false;
+              if (event.index_result && onIndexResult) {
+                onIndexResult(event.index_result, event.suggested_index);
+                hasVisualization = true;
+              }
+              if (event.geo_data && onGeoData) {
+                onGeoData(event.geo_data);
+                hasVisualization = true;
+              }
+
+              setMessages(prev => [...prev, {
+                id: Date.now() + 1,
+                text: event.answer,
+                sender: 'bot',
+                hasVisualization,
+                queryType: event.query_type,
+              }]);
+            } else if (event.type === 'error') {
+              setMessages(prev => [...prev, {
+                id: Date.now() + 1,
+                text: event.message || 'An error occurred.',
+                sender: 'bot',
+              }]);
+              streamingSucceeded = true; // prevent fallback
+            }
+          } catch (_) {
+            // skip malformed SSE line
+          }
+        }
+      }
+
+      if (!streamingSucceeded) {
+        throw new Error('Stream ended without done event');
+      }
+
     } catch (error) {
-      console.error("Query failed:", error);
-      const errorMsg = { id: Date.now() + 1, text: "Sorry, I'm having trouble connecting to the server.", sender: 'bot' };
-      setMessages(prev => [...prev, errorMsg]);
+      console.warn("Streaming failed, falling back to /api/chat:", error);
+      setProgressSteps([]);
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: userMessageText, thread_id: threadId }),
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          if (data.thread_id) setThreadId(data.thread_id);
+
+          let hasVisualization = false;
+          if (data.index_result && onIndexResult) {
+            onIndexResult(data.index_result, data.suggested_index);
+            hasVisualization = true;
+          }
+          if (data.geo_data && onGeoData) {
+            onGeoData(data.geo_data);
+            hasVisualization = true;
+          }
+
+          setMessages(prev => [...prev, {
+            id: Date.now() + 1,
+            text: data.answer,
+            sender: 'bot',
+            hasVisualization,
+            queryType: data.query_type,
+          }]);
+        } else {
+          setMessages(prev => [...prev, {
+            id: Date.now() + 1,
+            text: data.error || 'Something went wrong.',
+            sender: 'bot',
+          }]);
+        }
+      } catch (fallbackError) {
+        console.error("Fallback also failed:", fallbackError);
+        setMessages(prev => [...prev, {
+          id: Date.now() + 1,
+          text: "Sorry, I'm having trouble connecting to the server.",
+          sender: 'bot',
+        }]);
+      }
     } finally {
       setSending(false);
+      setProgressSteps([]);
     }
   };
 
@@ -188,6 +256,30 @@ export default function Chatbot({ onIndexResult, onGeoData, isMobileModal = fals
     }
   };
 
+  const statusDot = (
+    <span className={`status-dot ${apiHealthy === null ? 'checking' : apiHealthy ? 'online' : 'offline'}`} />
+  );
+
+  const progressDisplay = sending && (
+    <div className="chat-message bot">
+      {progressSteps.length > 0 ? (
+        <div className="progress-steps">
+          {progressSteps.map((step, i) => (
+            <div key={i} className={`progress-step${i === progressSteps.length - 1 ? ' active' : ' done'}`}>
+              {step}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="chat-bubble typing-indicator">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+      )}
+    </div>
+  );
+
   // Mobile full-screen modal mode
   if (isMobileModal) {
     return (
@@ -196,10 +288,8 @@ export default function Chatbot({ onIndexResult, onGeoData, isMobileModal = fals
           <button className="chat-back-button" onClick={onClose} aria-label="Close chat">
             ←
           </button>
-          <div className="chat-title">Data Assistant</div>
-          <div className="chat-status">
-            {apiHealthy === null ? 'Checking...' : apiHealthy ? 'Connected' : 'Offline'}
-          </div>
+          <div className="chat-title">🤖 Data Assistant</div>
+          <div className="chat-status">{statusDot}</div>
         </div>
 
         <div className="chat-messages" ref={messagesRef}>
@@ -221,15 +311,7 @@ export default function Chatbot({ onIndexResult, onGeoData, isMobileModal = fals
               </div>
             </div>
           ))}
-          {sending && (
-            <div className="chat-message bot">
-              <div className="chat-bubble typing-indicator">
-                <span></span>
-                <span></span>
-                <span></span>
-              </div>
-            </div>
-          )}
+          {progressDisplay}
         </div>
 
         <div className="chat-input">
@@ -241,7 +323,7 @@ export default function Chatbot({ onIndexResult, onGeoData, isMobileModal = fals
             rows={1}
           />
           <button className="chat-send" onClick={send} disabled={sending || !input.trim()}>
-            {sending ? '...' : 'Send'}
+            →
           </button>
         </div>
       </div>
@@ -254,10 +336,8 @@ export default function Chatbot({ onIndexResult, onGeoData, isMobileModal = fals
       {open && (
         <div className={`chat-window ${expanded ? 'expanded' : ''}`} role="dialog" aria-label="Chatbot window">
           <div className="chat-header">
-            <div className="chat-title">Data Assistant</div>
-            <div className="chat-status">
-              {apiHealthy === null ? 'Checking...' : apiHealthy ? 'Connected' : 'Offline'}
-            </div>
+            <div className="chat-title">🤖 Data Assistant</div>
+            <div className="chat-status">{statusDot}</div>
             <button className="chat-expand" onClick={() => setExpanded(e => !e)} aria-label={expanded ? 'Shrink chat' : 'Expand chat'}>
               {expanded ? '⊟' : '⊞'}
             </button>
@@ -283,15 +363,7 @@ export default function Chatbot({ onIndexResult, onGeoData, isMobileModal = fals
                 </div>
               </div>
             ))}
-            {sending && (
-              <div className="chat-message bot">
-                <div className="chat-bubble typing-indicator">
-                  <span></span>
-                  <span></span>
-                  <span></span>
-                </div>
-              </div>
-            )}
+            {progressDisplay}
           </div>
 
           <div className="chat-input">
@@ -303,7 +375,7 @@ export default function Chatbot({ onIndexResult, onGeoData, isMobileModal = fals
               rows={1}
             />
             <button className="chat-send" onClick={send} disabled={sending || !input.trim()}>
-              {sending ? '...' : 'Send'}
+              →
             </button>
             <button className="chat-test" onClick={testIndexDisplay} title="Test index display">
               🧪
@@ -312,10 +384,14 @@ export default function Chatbot({ onIndexResult, onGeoData, isMobileModal = fals
         </div>
       )}
 
-      <button className="chat-toggle" onClick={async () => {
-        if (!open) await checkHealth();
-        setOpen(o => !o);
-      }} aria-label="Open chat">
+      <button
+        className={`chat-toggle${sending ? ' thinking' : ''}`}
+        onClick={async () => {
+          if (!open) await checkHealth();
+          setOpen(o => !o);
+        }}
+        aria-label="Open chat"
+      >
         💬
       </button>
     </div>
