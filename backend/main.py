@@ -813,7 +813,7 @@ def chat():
     - geo_data: Geographic data for map display (if available)
     """
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True)
         if not data or not data.get("query"):
             return jsonify({"success": False, "error": "Query is required"}), 400
 
@@ -867,7 +867,7 @@ def chat_stream():
     - {"type": "error", "message": "..."}
     """
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True)
         if not data or not data.get("query"):
             return jsonify({"success": False, "error": "Query is required"}), 400
 
